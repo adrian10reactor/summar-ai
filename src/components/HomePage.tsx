@@ -126,6 +126,59 @@ export default function HomePage({
           <p className="text-sm">Upload a PDF to create your first quiz</p>
         </div>
       )}
+
+      <details className="group">
+        <summary className="text-xs text-zinc-600 cursor-pointer hover:text-zinc-400 transition-colors select-none">
+          About this POC
+        </summary>
+        <div className="mt-3 text-xs text-zinc-500 bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-3 animate-fade-in">
+          <div>
+            <p className="text-zinc-400 font-medium mb-1">What it does</p>
+            <p>
+              Upload one or more PDFs and Sumar AI generates a multiple-choice
+              quiz from the content. You can set the number of questions (3–50
+              or let the AI decide) and difficulty level (easy / medium / hard /
+              mixed). After taking the quiz you see your score with explanations
+              for every answer.
+            </p>
+          </div>
+          <div>
+            <p className="text-zinc-400 font-medium mb-1">How it works</p>
+            <p>
+              PDFs are sent as base64 to Google Gemini (free tier). The AI reads
+              the document natively and returns structured JSON with questions,
+              options, correct answers, and explanations. If a model hits its
+              rate limit the app automatically falls back through 14 different
+              Gemini models, each with its own free quota.
+            </p>
+          </div>
+          <div>
+            <p className="text-zinc-400 font-medium mb-1">Where data is stored</p>
+            <p>
+              Everything is stored in your browser&apos;s <code className="text-zinc-400">localStorage</code> — no
+              database, no server-side storage, no accounts. Quizzes persist
+              across page reloads but are tied to this browser. Clearing browser
+              data will delete them.
+            </p>
+          </div>
+          <div>
+            <p className="text-zinc-400 font-medium mb-1">Sharing &amp; export</p>
+            <p>
+              <strong className="text-zinc-400">Share</strong> copies a link with the full quiz
+              encoded in the URL hash (never sent to the server). <strong className="text-zinc-400">HTML</strong>{" "}
+              downloads a self-contained single-file quiz that works offline —
+              no server needed.
+            </p>
+          </div>
+          <div>
+            <p className="text-zinc-400 font-medium mb-1">Tech stack</p>
+            <p>
+              Next.js 16 · Tailwind CSS · Google Gemini 2.0 Flash (free tier) ·
+              No database · No auth
+            </p>
+          </div>
+        </div>
+      </details>
     </div>
   );
 }

@@ -16,7 +16,7 @@ export default function UploadStep({
   onError: () => void;
   onBack: () => void;
 }) {
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [name, setName] = useState("");
   const [count, setCount] = useState(10);
   const [autoCount, setAutoCount] = useState(false);
@@ -25,35 +25,52 @@ export default function UploadStep({
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
-    const f = e.dataTransfer.files[0];
-    if (f?.type === "application/pdf") {
-      setFile(f);
-      if (!name) setName(f.name.replace(/\.pdf$/i, ""));
-    }
+  const addFiles = (newFiles: FileList | File[]) => {
+    const pdfs = Array.from(newFiles).filter(
+      (f) => f.type === "application/pdf"
+    );
+    if (pdfs.length === 0) return;
+    setFiles((prev) => {
+      const existing = new Set(prev.map((f) => f.name + f.size));
+      const unique = pdfs.filter((f) => !existing.has(f.name + f.size));
+      return [...prev, ...unique];
+    });
+    if (!name) setName(pdfs[0].name.replace(/\.pdf$/i, ""));
   };
 
-  const handleFileChange = (f: File | null) => {
-    setFile(f);
-    if (f && !name) setName(f.name.replace(/\.pdf$/i, ""));
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const quizName = name.trim() || file?.name.replace(/\.pdf$/i, "") || "Untitled Quiz";
+  const totalSize = files.reduce((acc, f) => acc + f.size, 0);
+
+  const quizName =
+    name.trim() ||
+    (files.length === 1
+      ? files[0].name.replace(/\.pdf$/i, "")
+      : files.length > 1
+        ? `${files[0].name.replace(/\.pdf$/i, "")} + ${files.length - 1} more`
+        : "Untitled Quiz");
 
   const handleSubmit = async () => {
-    if (!file) return;
+    if (files.length === 0) return;
     setError("");
-    onLoading(file.name);
+    onLoading(
+      files.length === 1
+        ? files[0].name
+        : `${files.length} PDFs`
+    );
 
     const formData = new FormData();
-    formData.append("pdf", file);
+    files.forEach((f) => formData.append("pdf", f));
     formData.append("count", autoCount ? "auto" : String(count));
     formData.append("difficulty", difficulty);
 
     try {
-      const res = await fetch("/api/generate", { method: "POST", body: formData });
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        body: formData,
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to generate quiz");
       onGenerated(data, quizName);
@@ -80,14 +97,21 @@ export default function UploadStep({
       </button>
 
       <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
         onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          addFiles(e.dataTransfer.files);
+        }}
         onClick={() => inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-xl p-12 text-center cursor-pointer transition-all duration-200 ${
+        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-all duration-200 ${
           dragOver
             ? "border-violet-400 bg-violet-500/5 scale-[1.01]"
-            : file
+            : files.length > 0
               ? "border-violet-600/50 bg-violet-500/5"
               : "border-zinc-700 hover:border-violet-500"
         }`}
@@ -96,26 +120,60 @@ export default function UploadStep({
           ref={inputRef}
           type="file"
           accept=".pdf"
+          multiple
           className="hidden"
-          onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
+          onChange={(e) => {
+            if (e.target.files) addFiles(e.target.files);
+            e.target.value = "";
+          }}
         />
-        {file ? (
+        {files.length > 0 ? (
           <div className="animate-fade-in">
-            <p className="text-lg font-medium text-violet-400">{file.name}</p>
+            <p className="text-lg font-medium text-violet-400">
+              {files.length} PDF{files.length !== 1 ? "s" : ""} selected
+            </p>
             <p className="text-sm text-zinc-500 mt-1">
-              {(file.size / 1024 / 1024).toFixed(2)} MB
+              {(totalSize / 1024 / 1024).toFixed(2)} MB total — click to add
+              more
             </p>
           </div>
         ) : (
           <div>
             <p className="text-3xl mb-3">📄</p>
             <p className="text-zinc-400 text-lg">
-              Drop a PDF here or click to browse
+              Drop PDFs here or click to browse
             </p>
-            <p className="text-zinc-600 text-sm mt-1">Supports any text-based PDF</p>
+            <p className="text-zinc-600 text-sm mt-1">
+              Upload one or multiple PDFs
+            </p>
           </div>
         )}
       </div>
+
+      {files.length > 0 && (
+        <div className="space-y-1.5 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+          {files.map((f, i) => (
+            <div
+              key={f.name + f.size}
+              className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm group"
+            >
+              <span className="text-zinc-500 text-xs font-mono w-5 text-right shrink-0">
+                {i + 1}
+              </span>
+              <span className="text-zinc-300 truncate flex-1">{f.name}</span>
+              <span className="text-zinc-600 text-xs shrink-0">
+                {(f.size / 1024 / 1024).toFixed(1)} MB
+              </span>
+              <button
+                onClick={() => removeFile(i)}
+                className="text-zinc-600 hover:text-red-400 transition-colors text-xs shrink-0"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="space-y-4">
         <div className="flex items-center gap-4">
@@ -198,7 +256,7 @@ export default function UploadStep({
 
       <button
         onClick={handleSubmit}
-        disabled={!file}
+        disabled={files.length === 0}
         className="w-full py-3 rounded-xl font-semibold text-white bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
       >
         Generate Quiz

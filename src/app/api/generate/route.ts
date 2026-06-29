@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, Part } from "@google/generative-ai";
 
 const MODELS = [
   "gemini-2.0-flash",
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const formData = await req.formData();
-    const file = formData.get("pdf") as File | null;
+    const files = formData.getAll("pdf") as File[];
     const countRaw = formData.get("count") as string | null;
     const difficulty = (formData.get("difficulty") as string) || "mixed";
     const autoCount = countRaw === "auto";
@@ -37,12 +37,21 @@ export async function POST(req: NextRequest) {
       ? null
       : Math.min(Math.max(parseInt(countRaw || "10"), 3), 50);
 
-    if (!file) {
+    if (files.length === 0) {
       return NextResponse.json({ error: "No PDF uploaded" }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const base64 = Buffer.from(bytes).toString("base64");
+    const pdfParts: Part[] = [];
+    for (const file of files) {
+      const bytes = await file.arrayBuffer();
+      const base64 = Buffer.from(bytes).toString("base64");
+      pdfParts.push({
+        inlineData: {
+          mimeType: "application/pdf",
+          data: base64,
+        },
+      });
+    }
 
     const countInstruction = autoCount
       ? "Decide the appropriate number of questions based on the amount and complexity of the content (between 5 and 40)."
@@ -53,7 +62,14 @@ export async function POST(req: NextRequest) {
         ? "Mix easy, medium, and hard questions."
         : `All questions should be ${difficulty} difficulty.`;
 
-    const prompt = `You are a quiz generator for students. Based on the content of this PDF, ${countInstruction}
+    const multiFileNote =
+      files.length > 1
+        ? `You are given ${files.length} PDF documents. Generate questions that cover material from ALL of them.`
+        : "";
+
+    const prompt = `You are a quiz generator for students. Based on the content of the provided PDF${files.length > 1 ? "s" : ""}, ${countInstruction}
+
+${multiFileNote}
 
 Rules:
 - Each question must have exactly 4 options (A, B, C, D)
@@ -76,7 +92,6 @@ JSON format:
 }`;
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    let lastError: Error | null = null;
 
     for (const modelName of MODELS) {
       try {
@@ -85,12 +100,7 @@ JSON format:
 
         const result = await model.generateContent([
           { text: prompt },
-          {
-            inlineData: {
-              mimeType: "application/pdf",
-              data: base64,
-            },
-          },
+          ...pdfParts,
         ]);
 
         const raw = result.response.text();
@@ -102,11 +112,11 @@ JSON format:
 
         return NextResponse.json(quiz);
       } catch (e: unknown) {
-        lastError = e instanceof Error ? e : new Error(String(e));
+        const err = e instanceof Error ? e : new Error(String(e));
         const is429 =
-          lastError.message.includes("429") ||
-          lastError.message.includes("quota") ||
-          lastError.message.includes("RESOURCE_EXHAUSTED");
+          err.message.includes("429") ||
+          err.message.includes("quota") ||
+          err.message.includes("RESOURCE_EXHAUSTED");
         if (is429) {
           console.log(`Rate limited on ${modelName}, trying next model...`);
           continue;
