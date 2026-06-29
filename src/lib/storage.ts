@@ -12,9 +12,10 @@ export function getSavedQuizzes(): SavedQuiz[] {
   }
 }
 
-export function saveQuiz(quiz: Quiz): SavedQuiz {
+export function saveQuiz(quiz: Quiz, name: string): SavedQuiz {
   const saved: SavedQuiz = {
     id: crypto.randomUUID(),
+    name,
     quiz,
     createdAt: Date.now(),
   };
@@ -22,6 +23,15 @@ export function saveQuiz(quiz: Quiz): SavedQuiz {
   all.unshift(saved);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
   return saved;
+}
+
+export function renameQuiz(id: string, name: string) {
+  const all = getSavedQuizzes();
+  const item = all.find((q) => q.id === id);
+  if (item) {
+    item.name = name;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+  }
 }
 
 export function updateQuizScore(id: string, score: number) {

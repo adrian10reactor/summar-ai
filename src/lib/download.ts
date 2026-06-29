@@ -1,12 +1,13 @@
 import { Quiz } from "@/types";
 
-export function downloadQuizAsHtml(quiz: Quiz) {
+export function downloadQuizAsHtml(quiz: Quiz, name?: string) {
+  const displayName = name || quiz.title;
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${quiz.title} - Sumar AI</title>
+<title>${displayName} - Sumar AI</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #0f0f13; color: #e4e4e7; min-height: 100vh; display: flex; justify-content: center; padding: 3rem 1rem; }
@@ -49,7 +50,8 @@ export function downloadQuizAsHtml(quiz: Quiz) {
 <body>
 <div class="container">
   <h1>Sumar AI</h1>
-  <p class="subtitle">${quiz.title}</p>
+  <p class="subtitle">${displayName}</p>
+  <p style="text-align:center;color:#52525b;font-size:0.75rem;margin-bottom:2rem">${quiz.title}</p>
   <div id="quiz-view">
     <div class="stats"><span id="quiz-title"></span><span id="answered-count">0/${quiz.questions.length} answered</span></div>
     <div class="progress-bar"><div class="progress-fill" id="progress" style="width:0%"></div></div>
@@ -153,7 +155,7 @@ render();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${quiz.title.replace(/[^a-zA-Z0-9]/g, "_")}.html`;
+  a.download = `${displayName.replace(/[^a-zA-Z0-9]/g, "_")}.html`;
   a.click();
   URL.revokeObjectURL(url);
 }

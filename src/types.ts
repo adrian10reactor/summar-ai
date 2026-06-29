@@ -12,6 +12,7 @@ export interface Quiz {
 
 export interface SavedQuiz {
   id: string;
+  name: string;
   quiz: Quiz;
   createdAt: number;
   lastScore?: number;

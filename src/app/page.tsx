@@ -3,16 +3,16 @@
 import { useState, useCallback } from "react";
 import { Quiz } from "@/types";
 import { saveQuiz, updateQuizScore } from "@/lib/storage";
+import HomePage from "@/components/HomePage";
 import UploadStep from "@/components/UploadStep";
 import LoadingScreen from "@/components/LoadingScreen";
 import QuizStep from "@/components/QuizStep";
 import ResultStep from "@/components/ResultStep";
-import SavedQuizzes from "@/components/SavedQuizzes";
 
-type Step = "upload" | "loading" | "quiz" | "result";
+type Step = "home" | "create" | "loading" | "quiz" | "result";
 
 export default function Home() {
-  const [step, setStep] = useState<Step>("upload");
+  const [step, setStep] = useState<Step>("home");
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [score, setScore] = useState(0);
@@ -24,16 +24,19 @@ export default function Home() {
     setStep("loading");
   }, []);
 
-  const handleQuizGenerated = useCallback((q: Quiz) => {
-    const saved = saveQuiz(q);
-    setSavedId(saved.id);
-    setQuiz(q);
-    setAnswers({});
-    setStep("quiz");
-  }, []);
+  const handleQuizGenerated = useCallback(
+    (q: Quiz, name: string) => {
+      const saved = saveQuiz(q, name);
+      setSavedId(saved.id);
+      setQuiz(q);
+      setAnswers({});
+      setStep("quiz");
+    },
+    []
+  );
 
   const handleError = useCallback(() => {
-    setStep("upload");
+    setStep("create");
   }, []);
 
   const handlePlaySaved = useCallback((q: Quiz, id: string) => {
@@ -59,7 +62,7 @@ export default function Home() {
   );
 
   const handleReset = useCallback(() => {
-    setStep("upload");
+    setStep("home");
     setQuiz(null);
     setAnswers({});
     setScore(0);
@@ -70,23 +73,33 @@ export default function Home() {
   return (
     <div className="flex flex-col flex-1 items-center px-4 py-12">
       <header className="mb-10 text-center">
-        <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
-          Sumar AI
-        </h1>
+        <button onClick={handleReset}>
+          <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
+            Sumar AI
+          </h1>
+        </button>
         <p className="mt-2 text-zinc-400 text-sm">
           Upload a PDF, get an AI-generated quiz
         </p>
       </header>
 
       <main className="w-full max-w-2xl space-y-8">
-        {step === "upload" && (
-          <div className="animate-fade-in space-y-8">
+        {step === "home" && (
+          <div className="animate-fade-in">
+            <HomePage
+              onCreateNew={() => setStep("create")}
+              onPlay={handlePlaySaved}
+            />
+          </div>
+        )}
+        {step === "create" && (
+          <div className="animate-fade-in">
             <UploadStep
               onLoading={handleLoading}
               onGenerated={handleQuizGenerated}
               onError={handleError}
+              onBack={() => setStep("home")}
             />
-            <SavedQuizzes onPlay={handlePlaySaved} />
           </div>
         )}
         {step === "loading" && <LoadingScreen fileName={fileName} />}

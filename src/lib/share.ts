@@ -2,8 +2,7 @@ import { Quiz } from "@/types";
 
 export function encodeQuiz(quiz: Quiz): string {
   const json = JSON.stringify(quiz);
-  const encoded = btoa(unescape(encodeURIComponent(json)));
-  return encoded;
+  return btoa(unescape(encodeURIComponent(json)));
 }
 
 export function decodeQuiz(encoded: string): Quiz | null {
@@ -17,7 +16,7 @@ export function decodeQuiz(encoded: string): Quiz | null {
 
 export function getShareUrl(quiz: Quiz): string {
   const encoded = encodeQuiz(quiz);
-  return `${window.location.origin}/quiz?d=${encoded}`;
+  return `${window.location.origin}/quiz#${encoded}`;
 }
 
 export async function copyShareLink(quiz: Quiz): Promise<boolean> {
