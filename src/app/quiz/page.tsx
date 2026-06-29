@@ -44,7 +44,7 @@ export default function SharedQuizPage() {
       <header className="mb-10 text-center">
         <a href="/">
           <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
-            Sumar AI
+            Summar AI
           </h1>
         </a>
         <p className="mt-2 text-zinc-400 text-sm">Shared quiz</p>

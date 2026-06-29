@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sumar AI - PDF to Quiz",
+  title: "Summar AI - PDF to Quiz",
   description: "Upload a PDF and generate quizzes with AI",
 };
 

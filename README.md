@@ -1,4 +1,4 @@
-# Sumar AI
+# Summar AI
 
 Upload PDFs, get AI-generated quizzes. A study tool POC.
 

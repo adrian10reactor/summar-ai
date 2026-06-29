@@ -135,7 +135,7 @@ export default function HomePage({
           <div>
             <p className="text-zinc-400 font-medium mb-1">What it does</p>
             <p>
-              Upload one or more PDFs and Sumar AI generates a multiple-choice
+              Upload one or more PDFs and Summar AI generates a multiple-choice
               quiz from the content. You can set the number of questions (3–50
               or let the AI decide) and difficulty level (easy / medium / hard /
               mixed). After taking the quiz you see your score with explanations

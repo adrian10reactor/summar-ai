@@ -7,7 +7,7 @@ export function downloadQuizAsHtml(quiz: Quiz, name?: string) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${displayName} - Sumar AI</title>
+<title>${displayName} - Summar AI</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #0f0f13; color: #e4e4e7; min-height: 100vh; display: flex; justify-content: center; padding: 3rem 1rem; }
@@ -49,7 +49,7 @@ export function downloadQuizAsHtml(quiz: Quiz, name?: string) {
 </head>
 <body>
 <div class="container">
-  <h1>Sumar AI</h1>
+  <h1>Summar AI</h1>
   <p class="subtitle">${displayName}</p>
   <p style="text-align:center;color:#52525b;font-size:0.75rem;margin-bottom:2rem">${quiz.title}</p>
   <div id="quiz-view">
@@ -63,7 +63,7 @@ export function downloadQuizAsHtml(quiz: Quiz, name?: string) {
     <div class="q-grid" id="q-grid"></div>
   </div>
   <div id="result-view" class="hidden"></div>
-  <p class="footer">Generated with Sumar AI</p>
+  <p class="footer">Generated with Summar AI</p>
 </div>
 <script>
 const quiz = ${JSON.stringify(quiz)};

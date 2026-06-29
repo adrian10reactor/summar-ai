@@ -1,6 +1,6 @@
 import { Quiz, SavedQuiz } from "@/types";
 
-const STORAGE_KEY = "sumar-saved-quizzes";
+const STORAGE_KEY = "summar-saved-quizzes";
 
 export function getSavedQuizzes(): SavedQuiz[] {
   if (typeof window === "undefined") return [];

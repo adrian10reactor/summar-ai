@@ -75,7 +75,7 @@ export default function Home() {
       <header className="mb-10 text-center">
         <button onClick={handleReset}>
           <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">
-            Sumar AI
+            Summar AI
           </h1>
         </button>
         <p className="mt-2 text-zinc-400 text-sm">
