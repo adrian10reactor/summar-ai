@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI, Part, Content } from "@google/generative-ai";
 
 const MODELS = [
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
   "gemini-2.5-flash",
+  "gemini-2.0-flash",
   "gemini-2.5-flash-lite",
+  "gemini-2.0-flash-lite",
   "gemini-2.5-pro",
-  "gemini-3.5-flash",
-  "gemini-3.1-flash-lite",
-  "gemini-3-flash-preview",
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-8b",
+  "gemini-1.5-pro",
 ];
 
 export async function POST(req: NextRequest) {
@@ -104,17 +104,36 @@ Your job is to help them learn and understand the material. When answering:
         });
       } catch (e: unknown) {
         const err = e instanceof Error ? e : new Error(String(e));
-        if (err.message.includes("429") || err.message.includes("quota") || err.message.includes("RESOURCE_EXHAUSTED")) {
+        const m = err.message;
+        const isRetryable =
+          m.includes("429") || m.includes("quota") || m.includes("RESOURCE_EXHAUSTED") ||
+          m.includes("503") || m.includes("UNAVAILABLE") || m.includes("overloaded") || m.includes("high demand") ||
+          m.includes("500") || m.includes("INTERNAL") ||
+          m.includes("502") || m.includes("504") || m.includes("DEADLINE_EXCEEDED");
+        if (isRetryable) {
+          console.log(`${modelName} unavailable (${m.slice(0, 80)}), trying next...`);
           continue;
         }
         throw e;
       }
     }
 
-    return NextResponse.json({ error: "All models rate-limited. Try again in a minute." }, { status: 429 });
+    return NextResponse.json({ error: "High usage — try again in a minute." }, { status: 503 });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "Unknown error";
-    console.error("Chat error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const raw = e instanceof Error ? e.message : "Unknown error";
+    console.error("Chat error:", raw);
+    let clean = raw;
+    if (/429|quota|RESOURCE_EXHAUSTED|503|UNAVAILABLE|overloaded|high demand|500|INTERNAL|502|504|DEADLINE_EXCEEDED/.test(raw)) {
+      clean = "High usage — try again in a minute.";
+    } else if (/PERMISSION_DENIED|API key not valid|API_KEY_INVALID/.test(raw)) {
+      clean = "API key issue — check your configuration.";
+    } else if (/SAFETY/.test(raw)) {
+      clean = "Blocked by safety filter.";
+    } else if (/expired|NOT_FOUND.*files/.test(raw)) {
+      clean = "Uploaded PDFs expired (48h limit) — re-upload them.";
+    } else if (raw.length > 120) {
+      clean = "Chat failed. Try again.";
+    }
+    return NextResponse.json({ error: clean }, { status: 500 });
   }
 }

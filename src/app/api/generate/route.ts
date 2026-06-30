@@ -2,20 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI, Part } from "@google/generative-ai";
 
 const MODELS = [
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
   "gemini-2.5-flash",
+  "gemini-2.0-flash",
   "gemini-2.5-flash-lite",
+  "gemini-2.0-flash-lite",
   "gemini-2.5-pro",
-  "gemini-3.5-flash",
-  "gemini-3.1-flash-lite",
-  "gemini-3-flash-preview",
-  "gemini-3-pro-preview",
-  "gemini-3.1-pro-preview",
   "gemini-2.0-flash-001",
   "gemini-2.0-flash-lite-001",
-  "gemma-4-31b-it",
-  "gemma-4-26b-a4b-it",
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-8b",
+  "gemini-1.5-pro",
 ];
 
 type Mode = "quiz" | "study-guide" | "cheat-sheet" | "exam-prep" | "custom";
@@ -152,18 +148,36 @@ async function callGemini(apiKey: string, prompt: string, parts: Part[]) {
       };
     } catch (e: unknown) {
       const err = e instanceof Error ? e : new Error(String(e));
-      const is429 =
-        err.message.includes("429") ||
-        err.message.includes("quota") ||
-        err.message.includes("RESOURCE_EXHAUSTED");
-      if (is429) {
-        console.log(`Rate limited on ${modelName}, trying next...`);
+      const m = err.message;
+      const isRetryable =
+        m.includes("429") || m.includes("quota") || m.includes("RESOURCE_EXHAUSTED") ||
+        m.includes("503") || m.includes("UNAVAILABLE") || m.includes("overloaded") || m.includes("high demand") ||
+        m.includes("500") || m.includes("INTERNAL") ||
+        m.includes("502") || m.includes("504") || m.includes("DEADLINE_EXCEEDED");
+      if (isRetryable) {
+        console.log(`${modelName} unavailable (${m.slice(0, 80)}), trying next...`);
         continue;
       }
       throw e;
     }
   }
-  throw new Error("All models are rate-limited. Wait a minute and try again.");
+  throw new Error("High usage — try again in a minute.");
+}
+
+function cleanError(message: string): string {
+  if (/429|quota|RESOURCE_EXHAUSTED|503|UNAVAILABLE|overloaded|high demand|500|INTERNAL|502|504|DEADLINE_EXCEEDED/.test(message)) {
+    return "High usage — try again in a minute.";
+  }
+  if (/PERMISSION_DENIED|API key not valid|API_KEY_INVALID/.test(message)) {
+    return "API key issue — check your configuration.";
+  }
+  if (/SAFETY/.test(message)) {
+    return "Blocked by safety filter. Try different materials or prompt.";
+  }
+  if (/expired|NOT_FOUND.*files/.test(message)) {
+    return "Uploaded PDFs expired (48h limit) — re-upload them.";
+  }
+  return message.length > 120 ? "Generation failed. Try again." : message;
 }
 
 export async function POST(req: NextRequest) {
@@ -244,8 +258,8 @@ export async function POST(req: NextRequest) {
       _usage: { tokensIn: result.tokensIn, tokensOut: result.tokensOut },
     });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "Unknown error";
-    console.error("Generate error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const raw = e instanceof Error ? e.message : "Unknown error";
+    console.error("Generate error:", raw);
+    return NextResponse.json({ error: cleanError(raw) }, { status: 500 });
   }
 }

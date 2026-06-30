@@ -34,8 +34,16 @@ export async function POST(req: NextRequest) {
       name: uploadResult.file.displayName || displayName,
     });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "Upload failed";
-    console.error("Upload error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const raw = e instanceof Error ? e.message : "Upload failed";
+    console.error("Upload error:", raw);
+    let clean = "Upload failed.";
+    if (/429|quota|RESOURCE_EXHAUSTED|503|UNAVAILABLE|overloaded/.test(raw)) {
+      clean = "High usage — try again in a minute.";
+    } else if (/PERMISSION_DENIED|API key not valid|API_KEY_INVALID/.test(raw)) {
+      clean = "API key issue.";
+    } else if (raw.length <= 120) {
+      clean = raw;
+    }
+    return NextResponse.json({ error: clean }, { status: 500 });
   }
 }
