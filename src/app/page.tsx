@@ -64,7 +64,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-zinc-950">
-      <div className="max-w-4xl mx-auto px-6 py-12">
+      <div className="max-w-4xl mx-auto px-4 md:px-6 py-8 md:py-12">
         <div className="flex items-center gap-4 mb-2">
           <img src="/logo.png" alt="Summar AI" className="h-16 w-auto object-contain" style={{ mixBlendMode: "screen" }} />
           <div>
@@ -81,7 +81,7 @@ export default function Home() {
 
         <div className="flex items-center gap-3 mb-6">
           {adding ? (
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-1 min-w-0">
               <input
                 autoFocus
                 value={newName}
@@ -91,7 +91,7 @@ export default function Home() {
                   if (e.key === "Escape") { setAdding(false); setNewName(""); }
                 }}
                 placeholder="Subject name..."
-                className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500 w-64"
+                className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500 flex-1 min-w-0 max-w-64"
               />
               <button onClick={handleCreate} className="px-4 py-2 rounded-lg bg-violet-600 text-white text-sm hover:bg-violet-500 transition-colors">
                 Create

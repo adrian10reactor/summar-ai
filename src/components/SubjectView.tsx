@@ -53,7 +53,13 @@ export default function SubjectView({
   const [tab, setTab] = useState<TabKey>("materials");
   const [lastCost, setLastCost] = useState<{ amount: number; action: string } | null>(null);
   const [chatLaunch, setChatLaunch] = useState<{ message: string; chatName: string; nonce: number } | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const pdfDataRef = useRef<Map<string, string>>(new Map());
+
+  const selectTab = (next: TabKey) => {
+    setTab(next);
+    setSidebarOpen(false);
+  };
 
   const getMaterialsForApi = () => {
     const out: { type: string; data: string; name: string; uri?: string; mimeType?: string }[] = [];
@@ -83,11 +89,11 @@ export default function SubjectView({
 
   const handleAskAboutText = (payload: { message: string; chatName: string }) => {
     setChatLaunch({ ...payload, nonce: Date.now() });
-    setTab("chat");
+    selectTab("chat");
   };
 
   const handleNavigateToSection = (target: SubjectTab | { kind: "custom"; id: string }) => {
-    setTab(target);
+    selectTab(target);
   };
 
   const customSections = subject.content.customSections || [];
@@ -95,25 +101,70 @@ export default function SubjectView({
     ? customSections.find((c) => c.id === tab.id)
     : null;
 
+  const activeLabel = isCustomTab(tab)
+    ? activeCustomSection?.name || "Section"
+    : SECTIONS.find((s) => s.key === tab)?.label || "Section";
+
   return (
     <div className="flex h-screen overflow-hidden bg-zinc-950">
+      {/* Mobile top bar */}
+      <div className="md:hidden fixed top-0 inset-x-0 z-30 flex items-center gap-2 px-3 h-12 border-b border-zinc-800 bg-zinc-950/95 backdrop-blur">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open menu"
+          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+        <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: subject.color }} />
+        <span className="text-sm font-semibold text-zinc-200 truncate">{subject.name}</span>
+        <span className="text-xs text-zinc-600">·</span>
+        <span className="text-xs text-zinc-400 truncate">{activeLabel}</span>
+        <div className="ml-auto" />
+        <span className={`text-xs font-mono shrink-0 ${balance < 1 ? "text-red-400" : "text-emerald-400"}`}>
+          &euro;{balance.toFixed(2)}
+        </span>
+      </div>
+
+      {/* Backdrop (mobile) */}
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="md:hidden fixed inset-0 z-40 bg-black/60 animate-fade-in"
+        />
+      )}
+
       {/* Section sidebar */}
-      <nav className="w-56 shrink-0 border-r border-zinc-800 flex flex-col h-full bg-zinc-950">
+      <nav className={`w-64 md:w-56 shrink-0 border-r border-zinc-800 flex flex-col h-full bg-zinc-950 transition-transform duration-200 ${
+        sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      } fixed md:relative z-50 md:z-auto top-0 left-0`}>
         <div className="p-3 border-b border-zinc-800">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors mb-2"
-          >
-            &larr; All subjects
-          </button>
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              &larr; All subjects
+            </button>
+            <button
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close menu"
+              className="md:hidden text-zinc-500 hover:text-zinc-300 text-xs px-1"
+            >
+              ✕
+            </button>
+          </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: subject.color }} />
             <h2 className="text-sm font-bold text-zinc-200 truncate flex-1">{subject.name}</h2>
             <button
               onClick={() => { if (confirm(`Delete "${subject.name}"?`)) onDelete(); }}
               className="text-zinc-700 hover:text-red-400 text-xs transition-colors"
+              aria-label="Delete subject"
             >
-              ✕
+              🗑
             </button>
           </div>
         </div>
@@ -126,7 +177,7 @@ export default function SubjectView({
             return (
               <button
                 key={s.key}
-                onClick={() => setTab(s.key)}
+                onClick={() => selectTab(s.key)}
                 className={`w-full text-left flex items-center gap-2 px-2.5 py-2 text-sm transition-colors rounded-lg ${
                   active ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
                 }`}
@@ -149,7 +200,7 @@ export default function SubjectView({
                 return (
                   <button
                     key={cs.id}
-                    onClick={() => setTab({ kind: "custom", id: cs.id })}
+                    onClick={() => selectTab({ kind: "custom", id: cs.id })}
                     className={`w-full text-left flex items-center gap-2 px-2.5 py-2 text-sm transition-colors rounded-lg ${
                       active ? "bg-zinc-800 text-zinc-100" : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200"
                     }`}
@@ -189,8 +240,8 @@ export default function SubjectView({
       </nav>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-5xl px-8 py-6">
+      <div className="flex-1 overflow-y-auto pt-12 md:pt-0">
+        <div className="max-w-5xl px-4 md:px-8 py-4 md:py-6">
           {tab === "materials" && (
             <MaterialsTab
               subject={subject}

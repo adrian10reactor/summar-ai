@@ -149,7 +149,7 @@ export default function ChatTab({
   }
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100vh - 80px)", minHeight: "400px" }}>
+    <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-100px)] min-h-[400px]">
       {/* Chat header */}
       <div className="flex items-center gap-2 mb-3 shrink-0">
         <div className="relative">

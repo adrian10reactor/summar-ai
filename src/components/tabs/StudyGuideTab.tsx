@@ -231,19 +231,19 @@ export default function StudyGuideTab({
 
       {error && <p className="text-red-400 text-sm bg-red-950/30 rounded-lg px-4 py-3">{error}</p>}
 
-      <div className="grid grid-cols-[200px_1fr] gap-4">
-        {/* Section sub-nav */}
-        <nav className="space-y-0.5 self-start sticky top-2">
-          <div className="text-[10px] text-zinc-600 uppercase tracking-wider px-2 mb-1">Lectures</div>
+      <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-4">
+        {/* Section sub-nav: horizontal pills on mobile, vertical list on desktop */}
+        <nav className="md:space-y-0.5 self-start md:sticky md:top-2 flex md:block gap-1.5 overflow-x-auto md:overflow-visible pb-2 md:pb-0 -mx-1 px-1">
+          <div className="hidden md:block text-[10px] text-zinc-600 uppercase tracking-wider px-2 mb-1">Lectures</div>
           {sections.map((s, i) => (
             <button
               key={i}
               onClick={() => setActiveIdx(i)}
               title={s.title}
-              className={`w-full text-left px-2.5 py-1.5 text-xs rounded-lg transition-colors ${
+              className={`shrink-0 md:w-full text-left px-2.5 py-1.5 text-xs rounded-lg transition-colors whitespace-nowrap md:whitespace-normal ${
                 i === safeIdx
-                  ? "bg-violet-600/20 text-violet-300 border-l-2 border-violet-500"
-                  : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 border-l-2 border-transparent"
+                  ? "bg-violet-600/20 text-violet-300 md:border-l-2 md:border-violet-500 border border-violet-500/40 md:border-l-2"
+                  : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 md:border-l-2 md:border-transparent border border-zinc-800"
               }`}
             >
               {shortTitle(s.title)}
