@@ -56,13 +56,20 @@ export default function SubjectView({
   const pdfDataRef = useRef<Map<string, string>>(new Map());
 
   const getMaterialsForApi = () => {
-    return subject.materials
-      .map((m) => ({
-        type: m.type,
-        data: m.type === "pdf" ? (pdfDataRef.current.get(m.id) || "") : m.data,
-        name: m.name,
-      }))
-      .filter((m) => m.data);
+    const out: { type: string; data: string; name: string; uri?: string; mimeType?: string }[] = [];
+    for (const m of subject.materials) {
+      if (m.type === "pdf") {
+        if (m.uri) {
+          out.push({ type: "pdf", data: "", name: m.name, uri: m.uri, mimeType: m.mimeType || "application/pdf" });
+        } else {
+          const base64 = pdfDataRef.current.get(m.id);
+          if (base64) out.push({ type: "pdf", data: base64, name: m.name });
+        }
+      } else if (m.data) {
+        out.push({ type: m.type, data: m.data, name: m.name });
+      }
+    }
+    return out;
   };
 
   const hasMaterials = subject.materials.length > 0;

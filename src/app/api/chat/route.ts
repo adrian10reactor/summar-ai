@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     } = body as {
       message: string;
       history: { role: "user" | "assistant"; content: string }[];
-      materials: { type: string; data: string; name: string }[];
+      materials: { type: string; data: string; name: string; uri?: string; mimeType?: string }[];
     };
 
     const materialParts: Part[] = [];
@@ -35,7 +35,13 @@ export async function POST(req: NextRequest) {
 
     for (const mat of materials) {
       if (mat.type === "pdf") {
-        materialParts.push({ inlineData: { mimeType: "application/pdf", data: mat.data } });
+        if (mat.uri) {
+          materialParts.push({ fileData: { mimeType: mat.mimeType || "application/pdf", fileUri: mat.uri } });
+        } else if (mat.data) {
+          materialParts.push({ inlineData: { mimeType: "application/pdf", data: mat.data } });
+        } else {
+          continue;
+        }
         materialNames.push(mat.name);
       } else if (mat.type === "text") {
         materialParts.push({ text: `[Study notes - "${mat.name}"]:\n${mat.data}\n` });

@@ -3,11 +3,12 @@
 import { useState, useRef, MutableRefObject } from "react";
 import { Subject, SubjectTab, Quiz } from "@/types";
 import {
-  addMaterial, removeMaterial,
+  addMaterial, removeMaterial, updateMaterial,
   saveStudyGuide, saveCheatSheet, saveExamPrep, saveQuizToSubject,
   addCustomSection, deleteCustomSection, updateCustomSection, saveCustomSectionHtml,
 } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
+import { parseApiResponse } from "@/lib/api";
 
 const GEN_SECTIONS = [
   { key: "study-guide", label: "Study Guide", icon: "📖", desc: "Comprehensive notes organized by topic" },
@@ -59,19 +60,35 @@ export default function MaterialsTab({
   const [editingCustomId, setEditingCustomId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editPrompt, setEditPrompt] = useState("");
+  const [uploading, setUploading] = useState<Set<string>>(new Set());
+  const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
 
   const handleAddPdfs = async (fileList: FileList | File[]) => {
     const pdfs = Array.from(fileList).filter((f) => f.type === "application/pdf");
     for (const file of pdfs) {
-      const existing = subject.materials.find((m) => m.name === file.name && m.size === file.size);
-      if (!existing) {
-        const bytes = await file.arrayBuffer();
-        const base64 = btoa(new Uint8Array(bytes).reduce((s, b) => s + String.fromCharCode(b), ""));
-        const mat = addMaterial(subject.id, { name: file.name, type: "pdf", data: "", size: file.size });
-        pdfDataRef.current.set(mat.id, base64);
+      const dup = subject.materials.find((m) => m.name === file.name && m.size === file.size);
+      if (dup) continue;
+
+      const mat = addMaterial(subject.id, { name: file.name, type: "pdf", data: "", size: file.size });
+      onUpdated();
+
+      setUploading((p) => new Set(p).add(mat.id));
+      setUploadErrors((p) => { const n = { ...p }; delete n[mat.id]; return n; });
+
+      try {
+        const fd = new FormData();
+        fd.append("file", file);
+        const res = await fetch("/api/upload-pdf", { method: "POST", body: fd });
+        const data = await parseApiResponse<{ uri: string; mimeType: string; name: string }>(res);
+        updateMaterial(subject.id, mat.id, { uri: data.uri, mimeType: data.mimeType });
+        onUpdated();
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : "Upload failed";
+        setUploadErrors((p) => ({ ...p, [mat.id]: msg }));
+      } finally {
+        setUploading((p) => { const n = new Set(p); n.delete(mat.id); return n; });
       }
     }
-    onUpdated();
   };
 
   const handleAddLink = () => {
@@ -128,8 +145,7 @@ export default function MaterialsTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Failed");
+      const data = await parseApiResponse<{ html: string; title?: string; questions?: import("@/types").Question[]; _usage?: { tokensIn: number; tokensOut: number } }>(res);
 
       const usage = data._usage || { tokensIn: 0, tokensOut: 0 };
       const apiCost = estimateApiCost(usage.tokensIn, usage.tokensOut);
@@ -140,7 +156,7 @@ export default function MaterialsTab({
       else if (mode === "cheat-sheet") saveCheatSheet(subject.id, data.html);
       else if (mode === "exam-prep") saveExamPrep(subject.id, data.html);
       else if (mode === "quiz") {
-        const quiz: Quiz = { title: data.title, questions: data.questions };
+        const quiz: Quiz = { title: data.title || "Quiz", questions: data.questions || [] };
         saveQuizToSubject(subject.id, quiz, data.title || "Quiz");
       } else if (mode === "custom" && opts?.customSectionId) {
         saveCustomSectionHtml(subject.id, opts.customSectionId, data.html);
@@ -326,15 +342,36 @@ export default function MaterialsTab({
             {subject.materials.length} material{subject.materials.length !== 1 ? "s" : ""} uploaded
           </h3>
           {subject.materials.map((m) => {
-            const loaded = m.type !== "pdf" || pdfDataRef.current.has(m.id);
+            const isPdf = m.type === "pdf";
+            const isUploading = uploading.has(m.id);
+            const uploadError = uploadErrors[m.id];
+            const hasUri = !!m.uri;
+            const hasMemoryBase64 = pdfDataRef.current.has(m.id) && !hasUri;
+            const ready = !isPdf || hasUri || hasMemoryBase64;
+            const needsReupload = isPdf && !ready && !isUploading && !uploadError;
+
             return (
               <div key={m.id}
                 className={`flex items-center gap-2.5 bg-zinc-900 border rounded-lg px-3 py-2 text-sm group ${
-                  loaded ? "border-zinc-800" : "border-amber-900/30"
+                  uploadError ? "border-red-900/40" : ready ? "border-zinc-800" : "border-amber-900/30"
                 }`}>
                 <span className="text-xs">{icons[m.type]}</span>
-                <span className={`truncate flex-1 ${loaded ? "text-zinc-300" : "text-zinc-500"}`}>{m.name}</span>
-                {!loaded && <span className="text-[10px] text-amber-400 shrink-0">re-upload needed</span>}
+                <span className={`truncate flex-1 ${ready ? "text-zinc-300" : "text-zinc-500"}`}>{m.name}</span>
+                {isUploading && (
+                  <span className="text-[10px] text-violet-400 flex items-center gap-1 shrink-0">
+                    <span className="inline-block w-2 h-2 border border-violet-400 border-t-transparent rounded-full animate-spin-slow" />
+                    uploading...
+                  </span>
+                )}
+                {uploadError && (
+                  <span className="text-[10px] text-red-400 shrink-0" title={uploadError}>upload failed</span>
+                )}
+                {needsReupload && (
+                  <span className="text-[10px] text-amber-400 shrink-0">re-upload needed</span>
+                )}
+                {hasUri && !isUploading && (
+                  <span className="text-[10px] text-emerald-500 shrink-0" title="Uploaded to Gemini File API">✓</span>
+                )}
                 <span className="text-zinc-600 text-xs shrink-0">{formatSize(m.size)}</span>
                 <button onClick={() => handleRemove(m.id)}
                   className="text-zinc-600 hover:text-red-400 text-xs opacity-0 group-hover:opacity-100 transition-opacity">

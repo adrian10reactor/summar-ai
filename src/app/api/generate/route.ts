@@ -184,7 +184,7 @@ export async function POST(req: NextRequest) {
       customSectionPrompt = "",
     } = body as {
       mode: Mode;
-      materials: { type: string; data: string; name: string }[];
+      materials: { type: string; data: string; name: string; uri?: string; mimeType?: string }[];
       customPrompt?: string;
       customSectionPrompt?: string;
     };
@@ -198,7 +198,13 @@ export async function POST(req: NextRequest) {
 
     for (const mat of materials) {
       if (mat.type === "pdf") {
-        parts.push({ inlineData: { mimeType: "application/pdf", data: mat.data } });
+        if (mat.uri) {
+          parts.push({ fileData: { mimeType: mat.mimeType || "application/pdf", fileUri: mat.uri } });
+        } else if (mat.data) {
+          parts.push({ inlineData: { mimeType: "application/pdf", data: mat.data } });
+        } else {
+          continue;
+        }
         fileCount++;
       } else if (mat.type === "link") {
         parts.push({ text: `[Reference link: ${mat.data}]\n` });

@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Subject, ChatMessage, ChatConversation } from "@/types";
 import { createChat, deleteChat, saveChatMessages, renameChat } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
+import { parseApiResponse } from "@/lib/api";
 
 export default function ChatTab({
   subject,
@@ -105,8 +106,7 @@ export default function ChatTab({
           materials,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Chat failed");
+      const data = await parseApiResponse<{ reply: string; _usage?: { tokensIn: number; tokensOut: number } }>(res);
 
       const usage = data._usage || { tokensIn: 0, tokensOut: 0 };
       const apiCost = estimateApiCost(usage.tokensIn, usage.tokensOut);

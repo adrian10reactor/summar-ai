@@ -26,6 +26,8 @@ export interface Material {
   data: string;
   size: number;
   addedAt: number;
+  uri?: string;
+  mimeType?: string;
 }
 
 export interface ChatMessage {

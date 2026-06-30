@@ -91,6 +91,17 @@ export function removeMaterial(subjectId: string, materialId: string) {
   }
 }
 
+export function updateMaterial(subjectId: string, materialId: string, patch: Partial<Material>) {
+  const all = getSubjects();
+  const s = all.find((s) => s.id === subjectId);
+  if (!s) return;
+  const mat = s.materials.find((m) => m.id === materialId);
+  if (mat) {
+    Object.assign(mat, patch);
+    saveSubjects(all);
+  }
+}
+
 export function saveStudyGuide(subjectId: string, html: string) {
   const all = getSubjects();
   const s = all.find((s) => s.id === subjectId);

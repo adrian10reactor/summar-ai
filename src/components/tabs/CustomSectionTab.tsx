@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Subject, CustomSection } from "@/types";
 import { saveCustomSectionHtml, deleteCustomSection, updateCustomSection } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
+import { parseApiResponse } from "@/lib/api";
 
 export default function CustomSectionTab({
   subject,
@@ -41,8 +42,7 @@ export default function CustomSectionTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "custom", materials, customSectionPrompt: section.prompt }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Generation failed");
+      const data = await parseApiResponse<{ html: string; _usage?: { tokensIn: number; tokensOut: number } }>(res);
 
       const usage = data._usage || { tokensIn: 0, tokensOut: 0 };
       const apiCost = estimateApiCost(usage.tokensIn, usage.tokensOut);

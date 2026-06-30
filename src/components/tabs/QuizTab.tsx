@@ -6,6 +6,7 @@ import { saveQuizToSubject, updateQuizScore, deleteQuiz } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
 import { copyShareLink } from "@/lib/share";
 import { downloadQuizAsHtml } from "@/lib/download";
+import { parseApiResponse } from "@/lib/api";
 import QuizStep from "../QuizStep";
 import ResultStep from "../ResultStep";
 
@@ -47,15 +48,14 @@ export default function QuizTab({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "quiz", materials }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Generation failed");
+      const data = await parseApiResponse<{ title?: string; questions: import("@/types").Question[]; _usage?: { tokensIn: number; tokensOut: number } }>(res);
 
       const usage = data._usage || { tokensIn: 0, tokensOut: 0 };
       const apiCost = estimateApiCost(usage.tokensIn, usage.tokensOut);
       const { charged } = deductCredits(apiCost, "quiz", subject.name, usage.tokensIn, usage.tokensOut);
       onCost(charged, "Generated Quiz");
 
-      const quiz: Quiz = { title: data.title, questions: data.questions };
+      const quiz: Quiz = { title: data.title || "Quiz", questions: data.questions };
       const saved = saveQuizToSubject(subject.id, quiz, data.title || "Quiz");
       setActiveQuiz(quiz);
       setActiveQuizId(saved.id);
