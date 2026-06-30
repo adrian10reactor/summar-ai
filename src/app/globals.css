@@ -47,3 +47,66 @@ body {
   from { opacity: 0; transform: translateX(-20px); }
   to { opacity: 1; transform: translateX(0); }
 }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-bar {
+  background-image: linear-gradient(
+    90deg,
+    rgba(139, 92, 246, 0) 0%,
+    rgba(139, 92, 246, 0.35) 50%,
+    rgba(139, 92, 246, 0) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4), 0 0 16px 0 rgba(139, 92, 246, 0.2); }
+  50% { box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.05), 0 0 24px 4px rgba(139, 92, 246, 0.35); }
+}
+
+.animate-glow {
+  animation: glow-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes check-pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-check {
+  animation: check-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 1.2s linear infinite;
+}
+
+@keyframes progress-stripes {
+  from { background-position: 0 0; }
+  to { background-position: 28px 0; }
+}
+
+.progress-stripes {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 28px 28px;
+  animation: progress-stripes 1s linear infinite;
+}

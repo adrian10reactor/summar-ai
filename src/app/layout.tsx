@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Summar AI - PDF to Quiz",
-  description: "Upload a PDF and generate quizzes with AI",
+  title: "Summar AI - Study Platform",
+  description: "Upload materials, generate quizzes, summaries, cheat sheets and more with AI",
 };
 
 export default function RootLayout({
@@ -27,7 +27,7 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="h-full">{children}</body>
     </html>
   );
 }
