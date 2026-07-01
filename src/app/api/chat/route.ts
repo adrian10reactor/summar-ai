@@ -144,9 +144,10 @@ When solving a physics/math problem, draw the setup — a skica with the problem
           m.includes("502") || m.includes("504") || m.includes("DEADLINE_EXCEEDED") ||
           m.includes("404") || m.includes("NOT_FOUND") || m.includes("not found");
         if (isRetryable) {
-          console.log(`${modelName} unavailable (${m.slice(0, 80)}), trying next...`);
+          console.log(`${modelName} unavailable — full error: ${m}`);
           continue;
         }
+        console.log(`${modelName} NON-retryable error (full): ${m}`);
         throw e;
       }
     }
