@@ -1,15 +1,14 @@
 "use client";
 
 import { useState, useRef, MutableRefObject } from "react";
-import { Subject, SubjectTab, Quiz, Material } from "@/types";
+import { Subject, SubjectTab, Material } from "@/types";
 import {
   addMaterial, removeMaterial, updateMaterial,
-  saveStudyGuide, saveCheatSheet, saveExamPrep, saveQuizToSubject,
-  addCustomSection, deleteCustomSection, updateCustomSection, saveCustomSectionHtml,
+  addCustomSection, deleteCustomSection, updateCustomSection,
 } from "@/lib/storage";
-import { deductCredits, estimateApiCost } from "@/lib/credits";
 import { parseApiResponse } from "@/lib/api";
 import { rasterizePdf } from "@/lib/pdfPages";
+import { GenerationState, BatchItem } from "@/lib/useGeneration";
 
 const GEN_SECTIONS = [
   { key: "study-guide", label: "Study Guide", icon: "📖", desc: "Comprehensive notes organized by topic" },
@@ -24,12 +23,11 @@ export default function MaterialsTab({
   subject,
   pdfDataRef,
   imageBlobRef,
-  getMaterials,
   hasLoadedMaterials,
   hasMaterials,
-  onCost,
   onUpdated,
   onNavigate,
+  generation,
 }: {
   subject: Subject;
   pdfDataRef: MutableRefObject<Map<string, string>>;
@@ -40,7 +38,9 @@ export default function MaterialsTab({
   onCost: (amount: number, action: string) => void;
   onUpdated: () => void;
   onNavigate: (target: NavTarget) => void;
+  generation: GenerationState;
 }) {
+  const { batch, generating, done, errors, statusText, generateOne, startBatch } = generation;
   const [tab, setTab] = useState<"pdf" | "image" | "link" | "text">("pdf");
   const [dragOver, setDragOver] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
@@ -52,14 +52,6 @@ export default function MaterialsTab({
 
   const [selected, setSelected] = useState<Set<string>>(new Set(["study-guide", "quiz", "cheat-sheet", "exam-prep"]));
   const [customPrompt, setCustomPrompt] = useState("");
-  const [generating, setGenerating] = useState<Set<string>>(new Set());
-  const [done, setDone] = useState<Set<string>>(new Set());
-  const [errors, setErrors] = useState<Record<string, string>>({});
-
-  type BatchItemState = "queued" | "generating" | "done" | "error";
-  type BatchItem = { key: string; label: string; icon: string; state: BatchItemState; startedAt?: number };
-  const [batch, setBatch] = useState<BatchItem[] | null>(null);
-  const [statusText, setStatusText] = useState("");
 
   const [editingCustomId, setEditingCustomId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
@@ -193,53 +185,6 @@ export default function MaterialsTab({
     });
   };
 
-  const generateOne = async (mode: string, opts?: { customSectionId?: string; customSectionPrompt?: string; label?: string }): Promise<{ ok: boolean; error?: string }> => {
-    const materials = getMaterials();
-    if (materials.length === 0) return { ok: false, error: "No materials" };
-    const stateKey = opts?.customSectionId || mode;
-    setGenerating((p) => new Set(p).add(stateKey));
-    setErrors((p) => { const n = { ...p }; delete n[stateKey]; return n; });
-    setStatusText(`Analyzing ${materials.length} material${materials.length !== 1 ? "s" : ""}...`);
-
-    try {
-      const body: Record<string, unknown> = { mode, materials };
-      if (customPrompt.trim()) body.customPrompt = customPrompt.trim();
-      if (opts?.customSectionPrompt) body.customSectionPrompt = opts.customSectionPrompt;
-
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      const data = await parseApiResponse<{ html: string; title?: string; questions?: import("@/types").Question[]; _usage?: { tokensIn: number; tokensOut: number } }>(res);
-
-      const usage = data._usage || { tokensIn: 0, tokensOut: 0 };
-      const apiCost = estimateApiCost(usage.tokensIn, usage.tokensOut);
-      const { charged } = deductCredits(apiCost, mode, subject.name, usage.tokensIn, usage.tokensOut);
-      onCost(charged, `Generated ${opts?.label || mode}`);
-
-      if (mode === "study-guide") saveStudyGuide(subject.id, data.html);
-      else if (mode === "cheat-sheet") saveCheatSheet(subject.id, data.html);
-      else if (mode === "exam-prep") saveExamPrep(subject.id, data.html);
-      else if (mode === "quiz") {
-        const quiz: Quiz = { title: data.title || "Quiz", questions: data.questions || [] };
-        saveQuizToSubject(subject.id, quiz, data.title || "Quiz");
-      } else if (mode === "custom" && opts?.customSectionId) {
-        saveCustomSectionHtml(subject.id, opts.customSectionId, data.html);
-      }
-
-      setDone((p) => new Set(p).add(stateKey));
-      onUpdated();
-      return { ok: true };
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "Failed";
-      setErrors((p) => ({ ...p, [stateKey]: msg }));
-      return { ok: false, error: msg };
-    } finally {
-      setGenerating((p) => { const n = new Set(p); n.delete(stateKey); return n; });
-    }
-  };
-
   const buildBatchItem = (key: string): BatchItem | null => {
     if (key.startsWith("custom:")) {
       const id = key.slice(7);
@@ -254,37 +199,7 @@ export default function MaterialsTab({
 
   const generateSelected = async () => {
     const queue = Array.from(selected).map(buildBatchItem).filter(Boolean) as BatchItem[];
-    if (queue.length === 0) return;
-    setBatch(queue);
-    setDone(new Set());
-    setErrors({});
-
-    for (let i = 0; i < queue.length; i++) {
-      const item = queue[i];
-      setBatch((b) => b ? b.map((x) => x.key === item.key ? { ...x, state: "generating", startedAt: Date.now() } : x) : b);
-      setStatusText(`Generating ${item.label}... (${i + 1}/${queue.length})`);
-
-      let result: { ok: boolean; error?: string };
-      if (item.key.startsWith("custom:")) {
-        const id = item.key.slice(7);
-        const sec = subject.content.customSections.find((c) => c.id === id);
-        if (sec) {
-          result = await generateOne("custom", { customSectionId: id, customSectionPrompt: sec.prompt, label: sec.name });
-        } else {
-          result = { ok: false, error: "Section missing" };
-        }
-      } else {
-        result = await generateOne(item.key);
-      }
-
-      setBatch((b) => b ? b.map((x) => x.key === item.key ? { ...x, state: result.ok ? "done" : "error" } : x) : b);
-    }
-
-    setStatusText("All done!");
-    setTimeout(() => {
-      setBatch(null);
-      setStatusText("");
-    }, 2500);
+    await startBatch(queue, customPrompt);
   };
 
   const hasExisting = (key: string) => {
@@ -608,7 +523,7 @@ export default function MaterialsTab({
                     <p className="text-xs text-zinc-500">{s.desc}</p>
                     {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
                   </div>
-                  <button onClick={() => generateOne(s.key)} disabled={!hasLoadedMaterials || anyGenerating}
+                  <button onClick={() => generateOne(s.key, { customPrompt })} disabled={!hasLoadedMaterials || anyGenerating}
                     className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 disabled:opacity-30 transition-colors shrink-0">
                     {isGenerating ? "..." : exists ? "Regen" : "Generate"}
                   </button>
@@ -702,7 +617,7 @@ export default function MaterialsTab({
                     className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors shrink-0">
                     Edit
                   </button>
-                  <button onClick={() => generateOne("custom", { customSectionId: cs.id, customSectionPrompt: cs.prompt, label: cs.name })}
+                  <button onClick={() => generateOne("custom", { customSectionId: cs.id, customSectionPrompt: cs.prompt, label: cs.name, customPrompt })}
                     disabled={!hasLoadedMaterials || anyGenerating || !cs.prompt}
                     className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 disabled:opacity-30 transition-colors shrink-0">
                     {isGenerating ? "..." : exists ? "Regen" : "Generate"}

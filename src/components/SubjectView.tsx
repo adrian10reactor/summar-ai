@@ -10,6 +10,7 @@ import ExamPrepTab from "./tabs/ExamPrepTab";
 import ChatTab from "./tabs/ChatTab";
 import CustomSectionTab from "./tabs/CustomSectionTab";
 import { ImageLookup } from "@/lib/render";
+import { useGeneration } from "@/lib/useGeneration";
 
 type TabKey = SubjectTab | { kind: "custom"; id: string };
 
@@ -108,6 +109,8 @@ export default function SubjectView({
     setTimeout(() => setLastCost(null), 8000);
   };
 
+  const generation = useGeneration(subject, getMaterialsForApi, handleCostIncurred, onSubjectUpdated);
+
   const handleAskAboutText = (payload: { message: string; chatName: string }) => {
     setChatLaunch({ ...payload, nonce: Date.now() });
     selectTab("chat");
@@ -144,6 +147,21 @@ export default function SubjectView({
         <span className="text-xs text-zinc-600">·</span>
         <span className="text-xs text-zinc-400 truncate">{activeLabel}</span>
         <div className="ml-auto" />
+        {generation.batch && (() => {
+          const total = generation.batch.length;
+          const doneCount = generation.batch.filter((b) => b.state === "done" || b.state === "error").length;
+          const allDone = doneCount === total;
+          return (
+            <button
+              onClick={() => selectTab("materials")}
+              className="flex items-center gap-1 text-[10px] text-violet-300 border border-violet-500/40 bg-violet-500/10 rounded-full px-2 py-0.5 shrink-0"
+            >
+              {!allDone && <span className="w-1.5 h-1.5 rounded-full border border-violet-300 border-t-transparent animate-spin-slow" />}
+              {allDone && <span className="text-emerald-400">✓</span>}
+              <span className="font-mono">{doneCount}/{total}</span>
+            </button>
+          );
+        })()}
         <span className={`text-xs font-mono shrink-0 ${balance < 1 ? "text-red-400" : "text-emerald-400"}`}>
           &euro;{balance.toFixed(2)}
         </span>
@@ -236,6 +254,36 @@ export default function SubjectView({
             </>
           )}
 
+          {generation.batch && (() => {
+            const total = generation.batch.length;
+            const doneCount = generation.batch.filter((b) => b.state === "done" || b.state === "error").length;
+            const allDone = doneCount === total;
+            const errCount = generation.batch.filter((b) => b.state === "error").length;
+            const pct = (doneCount / Math.max(total, 1)) * 100;
+            return (
+              <button
+                onClick={() => selectTab("materials")}
+                className="mx-1 mt-3 w-[calc(100%-8px)] block text-left px-2.5 py-2 rounded-lg border border-violet-500/30 bg-gradient-to-br from-violet-900/40 to-zinc-900 hover:from-violet-800/40 transition-colors animate-fade-in"
+                title="Open Materials tab to see details"
+              >
+                <div className="flex items-center gap-1.5 mb-1">
+                  {!allDone && <div className="w-2.5 h-2.5 rounded-full border-2 border-violet-400 border-t-transparent animate-spin-slow" />}
+                  {allDone && <span className="text-emerald-400 text-xs animate-check">✓</span>}
+                  <span className="text-[10px] font-semibold text-zinc-200 flex-1 truncate">
+                    {allDone ? (errCount ? `${errCount} error${errCount !== 1 ? "s" : ""}` : "All done!") : "Generating…"}
+                  </span>
+                  <span className="text-[10px] text-violet-300 font-mono shrink-0">{doneCount}/{total}</span>
+                </div>
+                <div className="h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full ${allDone ? (errCount ? "bg-amber-500" : "bg-emerald-500") : "bg-gradient-to-r from-violet-500 to-indigo-500 progress-stripes"} transition-all duration-500 ease-out`}
+                    style={{ width: `${Math.max(pct, 3)}%` }}
+                  />
+                </div>
+              </button>
+            );
+          })()}
+
           {lastCost && (
             <div className="mx-1 mt-3 px-2.5 py-2 bg-amber-950/30 border border-amber-800/30 rounded-lg animate-fade-in">
               <p className="text-[10px] text-amber-400">{lastCost.action}</p>
@@ -274,6 +322,7 @@ export default function SubjectView({
               onCost={handleCostIncurred}
               onUpdated={onSubjectUpdated}
               onNavigate={handleNavigateToSection}
+              generation={generation}
             />
           )}
           {tab === "study-guide" && (
