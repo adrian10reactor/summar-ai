@@ -17,13 +17,26 @@ export interface OpenRouterResult {
   modelUsed: string;
 }
 
-// Ordered fallback list — start with cheapest strong model, escalate if it fails.
+// Ordered fallback list. Free models come first so no money is spent unless
+// they exhaust their (small) daily quotas. Paid models kick in only after
+// that and only if the OpenRouter account actually has credit.
+// Model IDs verified against OpenRouter's live /api/v1/models list.
 export const OPENROUTER_MODELS = [
+  // Free tier — usually ~20-50 requests/day per model, no charge.
+  // Ordered by expected quality for study-guide / chat use cases.
+  "nvidia/nemotron-3-ultra-550b-a55b:free",
+  "qwen/qwen3-next-80b-a3b-instruct:free",
+  "openai/gpt-oss-120b:free",
+  "nousresearch/hermes-3-llama-3.1-405b:free",
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "google/gemma-4-31b-it:free",
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "google/gemma-4-26b-a4b-it:free",
+  // Paid fallback — only used if the above are all exhausted AND the OpenRouter
+  // account has credit. Cheapest strong options first.
   "anthropic/claude-haiku-4.5",
   "openai/gpt-4o-mini",
   "anthropic/claude-sonnet-4.5",
-  "google/gemini-2.5-flash",
-  "google/gemini-2.5-pro",
 ];
 
 export function isOpenRouterConfigured(): boolean {
