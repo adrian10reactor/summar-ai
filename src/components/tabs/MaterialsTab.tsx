@@ -9,6 +9,7 @@ import {
 } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
 import { parseApiResponse } from "@/lib/api";
+import { rasterizePdf } from "@/lib/pdfPages";
 
 const GEN_SECTIONS = [
   { key: "study-guide", label: "Study Guide", icon: "📖", desc: "Comprehensive notes organized by topic" },
@@ -65,6 +66,8 @@ export default function MaterialsTab({
   const [editPrompt, setEditPrompt] = useState("");
   const [uploading, setUploading] = useState<Set<string>>(new Set());
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
+  // materialId -> { done, total } while pdf pages are being rasterized
+  const [rasterProgress, setRasterProgress] = useState<Record<string, { done: number; total: number }>>({});
 
   const isImage = (f: File) => f.type.startsWith("image/");
   const isPdf = (f: File) => f.type === "application/pdf";
@@ -87,6 +90,36 @@ export default function MaterialsTab({
     }
   };
 
+  const rasterizePdfMaterial = async (materialId: string, file: File) => {
+    try {
+      // Peek at page count first (cheap) so we can show total in progress badge.
+      // We'll set an initial "done: 0, total: ~unknown" and update as pages complete.
+      setRasterProgress((p) => ({ ...p, [materialId]: { done: 0, total: 0 } }));
+
+      const { pageCount } = await rasterizePdf(
+        file,
+        ({ pageNum, blobUrl }) => {
+          imageBlobRef.current.set(`${materialId}::${pageNum}`, blobUrl);
+          setRasterProgress((p) => ({
+            ...p,
+            [materialId]: { done: pageNum, total: p[materialId]?.total || pageNum },
+          }));
+        }
+      );
+
+      updateMaterial(subject.id, materialId, { pageCount });
+      onUpdated();
+    } catch (e) {
+      console.error("PDF rasterization failed:", e);
+    } finally {
+      setRasterProgress((p) => {
+        const n = { ...p };
+        delete n[materialId];
+        return n;
+      });
+    }
+  };
+
   const handleAddFiles = async (fileList: FileList | File[]) => {
     const files = Array.from(fileList).filter((f) => isPdf(f) || isImage(f));
     for (const file of files) {
@@ -101,6 +134,12 @@ export default function MaterialsTab({
       onUpdated();
 
       await uploadFile(mat, file);
+
+      // Kick off page rasterization for PDFs in the background so the model can
+      // reference specific pages as figures. Doesn't block the upload flow.
+      if (type === "pdf") {
+        rasterizePdfMaterial(mat.id, file);
+      }
     }
   };
 
@@ -404,6 +443,7 @@ export default function MaterialsTab({
             const ready = !isFile || hasUri || hasMemoryBase64;
             const needsReupload = isFile && !ready && !isUploading && !uploadError;
             const thumb = m.type === "image" ? imageBlobRef.current.get(m.id) : undefined;
+            const raster = rasterProgress[m.id];
 
             return (
               <div key={m.id}
@@ -428,8 +468,19 @@ export default function MaterialsTab({
                 {needsReupload && (
                   <span className="text-[10px] text-amber-400 shrink-0">re-upload needed</span>
                 )}
-                {hasUri && !isUploading && (
+                {hasUri && !isUploading && !raster && (
                   <span className="text-[10px] text-emerald-500 shrink-0" title="Uploaded to Gemini File API">✓</span>
+                )}
+                {raster && (
+                  <span className="text-[10px] text-violet-400 flex items-center gap-1 shrink-0" title="Rendering pages so figures can be embedded">
+                    <span className="inline-block w-2 h-2 border border-violet-400 border-t-transparent rounded-full animate-spin-slow" />
+                    rendering page {raster.done}
+                  </span>
+                )}
+                {m.pageCount && m.type === "pdf" && !raster && (
+                  <span className="text-[10px] text-zinc-600 shrink-0" title={`${m.pageCount} pages rasterized for inline figures`}>
+                    {m.pageCount}p
+                  </span>
                 )}
                 <span className="text-zinc-600 text-xs shrink-0">{formatSize(m.size)}</span>
                 <button onClick={() => handleRemove(m.id)}
