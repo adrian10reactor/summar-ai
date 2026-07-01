@@ -60,32 +60,52 @@ function downloadAsHtml(contentHtml: string, displayName: string) {
   URL.revokeObjectURL(url);
 }
 
-type Section = { title: string; html: string };
+type Subsection = { title: string; html: string };
+type Section = { title: string; introHtml: string; subsections: Subsection[] };
 
 function splitIntoSections(html: string): Section[] {
-  if (typeof window === "undefined") return [{ title: "All", html }];
+  if (typeof window === "undefined") return [{ title: "All", introHtml: html, subsections: [] }];
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
   const root = doc.body.firstElementChild;
-  if (!root) return [{ title: "All", html }];
+  if (!root) return [{ title: "All", introHtml: html, subsections: [] }];
 
   const sections: Section[] = [];
-  let current: Section | null = null;
+  let currentSection: Section | null = null;
+  let currentSub: Subsection | null = null;
+
+  const closeSub = () => {
+    if (currentSection && currentSub) {
+      currentSection.subsections.push(currentSub);
+      currentSub = null;
+    }
+  };
 
   for (const child of Array.from(root.children)) {
     if (child.tagName === "H2") {
-      if (current) sections.push(current);
-      current = { title: child.textContent || `Section ${sections.length + 1}`, html: "" };
-    } else if (current) {
-      current.html += child.outerHTML;
+      closeSub();
+      if (currentSection) sections.push(currentSection);
+      currentSection = { title: child.textContent || `Section ${sections.length + 1}`, introHtml: "", subsections: [] };
+    } else if (child.tagName === "H3") {
+      closeSub();
+      if (!currentSection) {
+        currentSection = { title: "Overview", introHtml: "", subsections: [] };
+      }
+      currentSub = { title: child.textContent || `Part ${currentSection.subsections.length + 1}`, html: "" };
     } else {
-      // Content before the first h2 — treat as intro
-      current = { title: "Overview", html: child.outerHTML };
+      if (currentSub) {
+        currentSub.html += child.outerHTML;
+      } else if (currentSection) {
+        currentSection.introHtml += child.outerHTML;
+      } else {
+        currentSection = { title: "Overview", introHtml: child.outerHTML, subsections: [] };
+      }
     }
   }
-  if (current) sections.push(current);
+  closeSub();
+  if (currentSection) sections.push(currentSection);
 
-  if (sections.length === 0) return [{ title: "All", html }];
+  if (sections.length === 0) return [{ title: "All", introHtml: html, subsections: [] }];
   return sections;
 }
 
@@ -116,6 +136,7 @@ export default function StudyGuideTab({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
+  const [activeSubIdx, setActiveSubIdx] = useState(0);
   const [selectionTooltip, setSelectionTooltip] = useState<{ x: number; y: number; text: string } | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -210,6 +231,11 @@ export default function StudyGuideTab({
 
   const active = sections[activeIdx] || sections[0];
   const safeIdx = Math.min(activeIdx, sections.length - 1);
+  const subs = active?.subsections || [];
+  const safeSubIdx = subs.length > 0 ? Math.min(activeSubIdx, subs.length - 1) : 0;
+  const activeSub = subs[safeSubIdx];
+  const bodyHtml = subs.length > 0 ? (activeSub?.html || "") : (active?.introHtml || "");
+  const chooseSection = (i: number) => { setActiveIdx(i); setActiveSubIdx(0); };
 
   return (
     <div className="space-y-3">
@@ -241,7 +267,7 @@ export default function StudyGuideTab({
           {sections.map((s, i) => (
             <button
               key={i}
-              onClick={() => setActiveIdx(i)}
+              onClick={() => chooseSection(i)}
               title={s.title}
               className={`shrink-0 md:w-full text-left px-2.5 py-1.5 text-xs rounded-lg transition-colors whitespace-nowrap md:whitespace-normal ${
                 i === safeIdx
@@ -249,14 +275,41 @@ export default function StudyGuideTab({
                   : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 md:border-l-2 md:border-transparent border border-zinc-800"
               }`}
             >
-              {shortTitle(s.title)}
+              <div>{shortTitle(s.title)}</div>
+              {s.subsections.length > 0 && (
+                <div className="text-[9px] text-zinc-600 md:block hidden mt-0.5">{s.subsections.length} parts</div>
+              )}
             </button>
           ))}
         </nav>
 
         {/* Active section content */}
         <div className="min-w-0">
-          <h2 className="text-xl font-bold text-violet-300 mb-4">{active?.title}</h2>
+          <h2 className="text-xl font-bold text-violet-300 mb-3">{active?.title}</h2>
+
+          {/* Sub-tabs (h3 → subsection) */}
+          {subs.length > 0 && (
+            <div className="flex gap-1.5 overflow-x-auto mb-3 pb-1 -mx-1 px-1 border-b border-zinc-800">
+              {subs.map((sub, i) => (
+                <button
+                  key={i}
+                  onClick={() => setActiveSubIdx(i)}
+                  title={sub.title}
+                  className={`shrink-0 text-xs px-3 py-1.5 rounded-t-lg transition-colors whitespace-nowrap border-b-2 -mb-px ${
+                    i === safeSubIdx
+                      ? "border-violet-500 text-violet-300 bg-violet-600/10"
+                      : "border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40"
+                  }`}
+                >
+                  {shortTitle(sub.title, 26)}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {subs.length > 0 && activeSub && (
+            <h3 className="text-lg font-semibold text-zinc-200 mb-3">{activeSub.title}</h3>
+          )}
 
           <div className="relative" ref={contentRef}>
             {selectionTooltip && (
@@ -309,28 +362,50 @@ export default function StudyGuideTab({
                 [&_hr]:border-zinc-800 [&_hr]:my-6
                 [&_details]:bg-zinc-950 [&_details]:rounded-lg [&_details]:p-4 [&_details]:my-3
                 [&_summary]:cursor-pointer [&_summary]:text-violet-400 [&_summary]:font-medium [&_summary]:text-sm"
-              dangerouslySetInnerHTML={{ __html: swapMaterialImages(active?.html || "", subject, imageLookup) }}
+              dangerouslySetInnerHTML={{ __html: swapMaterialImages(bodyHtml, subject, imageLookup) }}
             />
           </div>
 
-          {sections.length > 1 && (
-            <div className="flex justify-between mt-4">
-              <button
-                onClick={() => setActiveIdx(Math.max(0, safeIdx - 1))}
-                disabled={safeIdx === 0}
-                className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 disabled:opacity-30 transition-colors"
-              >
-                &larr; Previous
-              </button>
-              <button
-                onClick={() => setActiveIdx(Math.min(sections.length - 1, safeIdx + 1))}
-                disabled={safeIdx === sections.length - 1}
-                className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 disabled:opacity-30 transition-colors"
-              >
-                Next &rarr;
-              </button>
-            </div>
-          )}
+          {(sections.length > 1 || subs.length > 1) && (() => {
+            const goPrev = () => {
+              if (subs.length > 0 && safeSubIdx > 0) {
+                setActiveSubIdx(safeSubIdx - 1);
+              } else if (safeIdx > 0) {
+                const prevIdx = safeIdx - 1;
+                const prevSubs = sections[prevIdx].subsections;
+                setActiveIdx(prevIdx);
+                setActiveSubIdx(prevSubs.length > 0 ? prevSubs.length - 1 : 0);
+              }
+            };
+            const goNext = () => {
+              if (subs.length > 0 && safeSubIdx < subs.length - 1) {
+                setActiveSubIdx(safeSubIdx + 1);
+              } else if (safeIdx < sections.length - 1) {
+                setActiveIdx(safeIdx + 1);
+                setActiveSubIdx(0);
+              }
+            };
+            const atStart = safeIdx === 0 && (subs.length === 0 || safeSubIdx === 0);
+            const atEnd = safeIdx === sections.length - 1 && (subs.length === 0 || safeSubIdx === subs.length - 1);
+            return (
+              <div className="flex justify-between mt-4">
+                <button
+                  onClick={goPrev}
+                  disabled={atStart}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 disabled:opacity-30 transition-colors"
+                >
+                  &larr; Previous
+                </button>
+                <button
+                  onClick={goNext}
+                  disabled={atEnd}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 disabled:opacity-30 transition-colors"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            );
+          })()}
         </div>
       </div>
     </div>

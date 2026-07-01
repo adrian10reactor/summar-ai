@@ -53,23 +53,27 @@ JSON format:
 
 ${multiNote}
 
-CRITICAL STRUCTURE RULES:
-- You MUST organize the guide into clearly separated SECTIONS using <h2> for each major topic/lecture/chapter
-- Each <h2> section MUST have subsections using <h3> and <h4>
-- If the materials cover multiple lectures (e.g. "Lecture 02: MPI", "Lecture 03: PRAM"), each lecture MUST be its own <h2> section
-- Within each section, explain concepts thoroughly — don't just list bullet points
+CRITICAL STRUCTURE RULES — THE UI RENDERS <h2> AS TOP-LEVEL TABS AND <h3> AS SUB-TABS. STRUCTURE ACCORDINGLY:
+- <h2> = one per lecture / topic / chapter / uploaded PDF. If the materials cover "MPI", "PRAM", "APRAM", produce exactly one <h2> per one of those.
+- <h3> = subsection tabs INSIDE a given <h2>. Every <h2> should have 3–8 <h3> children that break the topic into digestible parts a student can flip through (e.g. "Overview & motivation", "Key concepts & terminology", "Algorithms & examples", "Common patterns", "Complexity analysis", "Practice questions").
+- <h4> = further headings INSIDE a subsection body (small groupings under an <h3>). Never use <h4> where an <h3> subtab would be more appropriate.
+- Content between <h2> and its first <h3> is treated as an intro paragraph for that lecture. Keep it short — one or two sentences — everything meaty belongs inside <h3> subsections.
+- Do NOT nest <h2> inside another section's content. Do NOT skip levels (no <h3> before any <h2>).
+
+CONTENT QUALITY:
+- Explain concepts thoroughly — full sentences, not just bullet lists. This should be a complete study resource, not a summary.
+- Cover ALL important knowledge from every provided material. Do not skip topics — students rely on this for exams.
 - Include key definitions in <strong> tags
 - Include formulas/code in <code> or <pre> blocks
-- Use <table> for comparisons, classifications, or structured data
-- Use examples with step-by-step explanations wrapped in a div: <div style="background:#1e222e;border-left:3px solid #5b9dff;border-radius:6px;padding:10px 14px;margin:10px 0">
-- Use tip boxes: <div style="background:#1a2e1a;border-left:3px solid #7ee787;border-radius:6px;padding:10px 14px;margin:10px 0">
-- Use warning boxes for common mistakes: <div style="background:#2e1a1a;border-left:3px solid #ff7b72;border-radius:6px;padding:10px 14px;margin:10px 0">
-- Separate sections with <hr>
+- Use <table> for comparisons, classifications, structured data
+- Wrap worked examples in: <div style="background:#1e222e;border-left:3px solid #5b9dff;border-radius:6px;padding:10px 14px;margin:10px 0">
+- Wrap study tips in: <div style="background:#1a2e1a;border-left:3px solid #7ee787;border-radius:6px;padding:10px 14px;margin:10px 0">
+- Wrap common-mistake warnings in: <div style="background:#2e1a1a;border-left:3px solid #ff7b72;border-radius:6px;padding:10px 14px;margin:10px 0">
+
+OUTPUT FORMAT:
 - Output ONLY valid HTML (no markdown, no code fences, no wrapping)
 - Use these HTML elements: <h2>, <h3>, <h4>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <code>, <pre>, <blockquote>, <table>, <tr>, <th>, <td>, <hr>, <div>
 - Do NOT include <html>, <head>, <body>, <style> tags
-- Make it VERY detailed and useful for studying — this should be a complete study resource
-- Each section should be long enough to actually learn from, not just a summary
 
 Start directly with the first <h2> tag. Do NOT start with any preamble text.`;
   }
