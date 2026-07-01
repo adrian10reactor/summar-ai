@@ -25,11 +25,13 @@ export async function POST(req: NextRequest) {
       history = [],
       materials = [],
       attachments = [],
+      crossSubject,
     } = body as {
       message: string;
       history: { role: "user" | "assistant"; content: string }[];
       materials: { type: string; data: string; name: string; uri?: string; mimeType?: string }[];
       attachments?: { name: string; mimeType: string; uri?: string; data?: string }[];
+      crossSubject?: { subjectNames: string[] };
     };
 
     const materialParts: Part[] = [];
@@ -72,7 +74,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const systemPrompt = `You are a helpful study assistant. The student has uploaded these materials: ${materialNames.join(", ")}.
+    const crossHint = crossSubject && crossSubject.subjectNames.length > 1
+      ? `\n\nThis is a CROSS-SUBJECT conversation. The student is combining these subjects at once: ${crossSubject.subjectNames.join(", ")}. Material file names are prefixed with [Subject Name] so you know which subject each source is from. Actively connect concepts across subjects when they overlap — call out when a technique from one subject applies in another.`
+      : "";
+
+    const systemPrompt = `You are a helpful study assistant. The student has uploaded these materials: ${materialNames.join(", ")}.${crossHint}
 
 Your job is to help them learn and understand the material. When answering:
 - Primarily use the uploaded materials as your knowledge source

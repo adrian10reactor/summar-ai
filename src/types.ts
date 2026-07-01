@@ -53,6 +53,14 @@ export interface ChatConversation {
   createdAt: number;
 }
 
+export interface CrossSubjectChat {
+  id: string;
+  name: string;
+  subjectIds: string[];
+  messages: ChatMessage[];
+  createdAt: number;
+}
+
 export interface CustomSection {
   id: string;
   name: string;

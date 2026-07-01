@@ -1,21 +1,32 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Subject } from "@/types";
-import { getSubjects, createSubject, deleteSubject } from "@/lib/storage";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Subject, CrossSubjectChat } from "@/types";
+import { getSubjects, createSubject, deleteSubject, getCrossChats, createCrossChat } from "@/lib/storage";
 import { getBalance, resetCredits } from "@/lib/credits";
 import SubjectView from "@/components/SubjectView";
+import CrossChatView from "@/components/CrossChatView";
+
+type Active =
+  | { kind: "home" }
+  | { kind: "subject"; id: string }
+  | { kind: "cross-chat"; id: string };
 
 export default function Home() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [crossChats, setCrossChats] = useState<CrossSubjectChat[]>([]);
+  const [active, setActive] = useState<Active>({ kind: "home" });
   const [balance, setBalance] = useState(10);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
+  const [creatingCross, setCreatingCross] = useState(false);
+  const [crossName, setCrossName] = useState("");
+  const [crossSelected, setCrossSelected] = useState<Set<string>>(new Set());
+  const crossImageBlobRef = useRef<Map<string, string>>(new Map());
 
   const refresh = useCallback(() => {
-    const all = getSubjects();
-    setSubjects(all);
+    setSubjects(getSubjects());
+    setCrossChats(getCrossChats());
     setBalance(getBalance());
   }, []);
 
@@ -30,13 +41,32 @@ export default function Home() {
     setNewName("");
     setAdding(false);
     refresh();
-    setActiveId(s.id);
+    setActive({ kind: "subject", id: s.id });
   };
 
   const handleDelete = (id: string) => {
     deleteSubject(id);
-    if (activeId === id) setActiveId(null);
+    if (active.kind === "subject" && active.id === id) setActive({ kind: "home" });
     refresh();
+  };
+
+  const handleCreateCrossChat = () => {
+    const trimmed = crossName.trim() || "Cross-subject chat";
+    if (crossSelected.size === 0) return;
+    const chat = createCrossChat(trimmed, Array.from(crossSelected));
+    setCrossName("");
+    setCrossSelected(new Set());
+    setCreatingCross(false);
+    refresh();
+    setActive({ kind: "cross-chat", id: chat.id });
+  };
+
+  const toggleCrossSubject = (id: string) => {
+    setCrossSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   };
 
   const handleResetCredits = () => {
@@ -46,20 +76,40 @@ export default function Home() {
     }
   };
 
-  const active = subjects.find((s) => s.id === activeId) || null;
+  if (active.kind === "subject") {
+    const s = subjects.find((x) => x.id === active.id);
+    if (s) {
+      return (
+        <SubjectView
+          key={s.id}
+          subject={s}
+          balance={balance}
+          onSubjectUpdated={refresh}
+          onBack={() => setActive({ kind: "home" })}
+          onResetCredits={handleResetCredits}
+          onDelete={() => { handleDelete(s.id); setActive({ kind: "home" }); }}
+        />
+      );
+    }
+  }
 
-  if (active) {
-    return (
-      <SubjectView
-        key={active.id}
-        subject={active}
-        balance={balance}
-        onSubjectUpdated={refresh}
-        onBack={() => setActiveId(null)}
-        onResetCredits={handleResetCredits}
-        onDelete={() => { handleDelete(active.id); setActiveId(null); }}
-      />
-    );
+  if (active.kind === "cross-chat") {
+    const chat = crossChats.find((c) => c.id === active.id);
+    if (chat) {
+      return (
+        <CrossChatView
+          key={chat.id}
+          chat={chat}
+          subjects={subjects}
+          balance={balance}
+          imageBlobRef={crossImageBlobRef}
+          onBack={() => setActive({ kind: "home" })}
+          onDelete={() => { refresh(); setActive({ kind: "home" }); }}
+          onResetCredits={handleResetCredits}
+          onUpdated={refresh}
+        />
+      );
+    }
   }
 
   return (
@@ -128,7 +178,7 @@ export default function Home() {
           {subjects.map((s) => (
             <button
               key={s.id}
-              onClick={() => setActiveId(s.id)}
+              onClick={() => setActive({ kind: "subject", id: s.id })}
               className="group p-4 rounded-xl border border-zinc-800 hover:border-violet-500/40 text-left transition-all hover:bg-zinc-900/50"
             >
               <div className="flex items-center gap-2 mb-2">
@@ -153,6 +203,105 @@ export default function Home() {
             </button>
           ))}
         </div>
+
+        {/* Cross-subject chats */}
+        {(subjects.length > 0 || crossChats.length > 0) && (
+          <div className="mt-10">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-base">🧩</span>
+              <h2 className="text-sm font-semibold text-zinc-300">Cross-subject chats</h2>
+              <p className="text-[11px] text-zinc-600 flex-1">Connect knowledge across multiple subjects at once</p>
+              {!creatingCross && subjects.length > 0 && (
+                <button
+                  onClick={() => setCreatingCross(true)}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-violet-400 hover:text-white hover:border-violet-500 transition-colors"
+                >
+                  + New
+                </button>
+              )}
+            </div>
+
+            {creatingCross && (
+              <div className="mb-3 p-4 rounded-xl border border-violet-500/30 bg-violet-500/5 space-y-3 animate-fade-in">
+                <div>
+                  <label className="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Name</label>
+                  <input
+                    autoFocus
+                    value={crossName}
+                    onChange={(e) => setCrossName(e.target.value)}
+                    placeholder="e.g. Math + Parallel Programming"
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-500 uppercase tracking-wider block mb-1">Include subjects</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {subjects.map((s) => (
+                      <label key={s.id} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={crossSelected.has(s.id)}
+                          onChange={() => toggleCrossSubject(s.id)}
+                          className="accent-violet-500 w-3.5 h-3.5"
+                        />
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                        <span className="text-xs text-zinc-300">{s.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleCreateCrossChat}
+                    disabled={crossSelected.size === 0}
+                    className="px-4 py-2 text-sm rounded-lg bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40 transition-colors"
+                  >
+                    Create
+                  </button>
+                  <button
+                    onClick={() => { setCreatingCross(false); setCrossName(""); setCrossSelected(new Set()); }}
+                    className="text-sm text-zinc-500 hover:text-zinc-300 px-2"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {crossChats.length === 0 && !creatingCross && (
+              <p className="text-xs text-zinc-600">No cross-subject chats yet. Create one to connect concepts across your subjects.</p>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {crossChats.map((c) => {
+                const includedSubjects = subjects.filter((s) => c.subjectIds.includes(s.id));
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => setActive({ kind: "cross-chat", id: c.id })}
+                    className="group p-4 rounded-xl border border-violet-500/20 hover:border-violet-500/50 bg-gradient-to-br from-violet-950/20 to-transparent text-left transition-all"
+                  >
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm">🧩</span>
+                      <span className="text-sm font-medium text-zinc-200 truncate flex-1">{c.name}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {includedSubjects.map((s) => (
+                        <span key={s.id} className="text-[10px] px-1.5 py-0.5 rounded-md bg-zinc-800 text-zinc-400 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: s.color }} />
+                          {s.name}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="text-[11px] text-zinc-600">
+                      {c.messages.length} message{c.messages.length !== 1 ? "s" : ""}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

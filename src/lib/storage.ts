@@ -1,6 +1,7 @@
-import { Quiz, SavedQuiz, Subject, Material, ChatMessage, ChatConversation, CustomSection } from "@/types";
+import { Quiz, SavedQuiz, Subject, Material, ChatMessage, ChatConversation, CustomSection, CrossSubjectChat } from "@/types";
 
 const SUBJECTS_KEY = "summar-subjects";
+const CROSS_CHATS_KEY = "summar-cross-chats";
 
 const SUBJECT_COLORS = [
   "#8b5cf6", "#6366f1", "#3b82f6", "#06b6d4",
@@ -264,6 +265,60 @@ export function deleteCustomSection(subjectId: string, sectionId: string) {
   if (!s) return;
   s.content.customSections = s.content.customSections.filter((c) => c.id !== sectionId);
   saveSubjects(all);
+}
+
+// Cross-subject chats (global, not scoped to any subject)
+
+export function getCrossChats(): CrossSubjectChat[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CROSS_CHATS_KEY);
+    if (!raw) return [];
+    const chats: CrossSubjectChat[] = JSON.parse(raw);
+    return chats.map((c) => ({ ...c, subjectIds: c.subjectIds || [], messages: c.messages || [] }));
+  } catch {
+    return [];
+  }
+}
+
+function saveCrossChats(chats: CrossSubjectChat[]) {
+  localStorage.setItem(CROSS_CHATS_KEY, JSON.stringify(chats));
+}
+
+export function createCrossChat(name: string, subjectIds: string[]): CrossSubjectChat {
+  const all = getCrossChats();
+  const chat: CrossSubjectChat = {
+    id: crypto.randomUUID(),
+    name,
+    subjectIds,
+    messages: [],
+    createdAt: Date.now(),
+  };
+  all.unshift(chat);
+  saveCrossChats(all);
+  return chat;
+}
+
+export function deleteCrossChat(id: string) {
+  saveCrossChats(getCrossChats().filter((c) => c.id !== id));
+}
+
+export function renameCrossChat(id: string, name: string) {
+  const all = getCrossChats();
+  const c = all.find((c) => c.id === id);
+  if (c) { c.name = name; saveCrossChats(all); }
+}
+
+export function updateCrossChatSubjects(id: string, subjectIds: string[]) {
+  const all = getCrossChats();
+  const c = all.find((c) => c.id === id);
+  if (c) { c.subjectIds = subjectIds; saveCrossChats(all); }
+}
+
+export function saveCrossChatMessages(id: string, messages: ChatMessage[]) {
+  const all = getCrossChats();
+  const c = all.find((c) => c.id === id);
+  if (c) { c.messages = messages.slice(-100); saveCrossChats(all); }
 }
 
 export function getStorageUsage(): { used: number; limit: number } {
