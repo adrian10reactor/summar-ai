@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Subject, SubjectTab, ChatAttachment } from "@/types";
 import MaterialsTab from "./tabs/MaterialsTab";
 import StudyGuideTab from "./tabs/StudyGuideTab";
@@ -47,6 +47,7 @@ export default function SubjectView({
   onResetCredits,
   onDelete,
   onOpenOtherSubject,
+  initialTargetSection,
 }: {
   subject: Subject;
   balance: number;
@@ -54,9 +55,20 @@ export default function SubjectView({
   onBack: () => void;
   onResetCredits: () => void;
   onDelete: () => void;
-  onOpenOtherSubject?: (subjectId: string) => void;
+  onOpenOtherSubject?: (subjectId: string, section?: string) => void;
+  initialTargetSection?: string;
 }) {
-  const [tab, setTab] = useState<TabKey>("materials");
+  const [tab, setTab] = useState<TabKey>(initialTargetSection ? "study-guide" : "materials");
+  const [studyGuideJumpTarget, setStudyGuideJumpTarget] = useState<{ section: string; nonce: number } | null>(
+    initialTargetSection ? { section: initialTargetSection, nonce: 1 } : null
+  );
+
+  useEffect(() => {
+    if (initialTargetSection) {
+      setTab("study-guide");
+      setStudyGuideJumpTarget({ section: initialTargetSection, nonce: Date.now() });
+    }
+  }, [initialTargetSection]);
   const [lastCost, setLastCost] = useState<{ amount: number; action: string } | null>(null);
   const [chatLaunch, setChatLaunch] = useState<{ message: string; chatName: string; nonce: number; attachments?: ChatAttachment[] } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -341,6 +353,7 @@ export default function SubjectView({
               onAskAbout={handleAskAboutText}
               imageLookup={imageLookup}
               onCrossRefClick={setCrossRef}
+              jumpTarget={studyGuideJumpTarget}
             />
           )}
           {tab === "quiz" && (
@@ -414,7 +427,7 @@ export default function SubjectView({
           subjects={getSubjects()}
           imageLookup={imageLookup}
           onClose={() => setCrossRef(null)}
-          onOpenSubject={(id) => { onOpenOtherSubject?.(id); }}
+          onOpenSubject={(id, section) => { onOpenOtherSubject?.(id, section); }}
         />
       )}
     </div>

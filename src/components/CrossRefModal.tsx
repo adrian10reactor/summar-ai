@@ -60,7 +60,7 @@ export default function CrossRefModal({
   subjects: Subject[];
   imageLookup: ImageLookup;
   onClose: () => void;
-  onOpenSubject: (subjectId: string) => void;
+  onOpenSubject: (subjectId: string, section?: string) => void;
 }) {
   const subject = subjects.find((s) => s.id === target.subjectId);
   const snippet = useMemo(() => (subject ? findSectionSnippet(subject, target.section) : null), [subject, target.section]);
@@ -127,7 +127,7 @@ export default function CrossRefModal({
                 Close
               </button>
               <button
-                onClick={() => { onOpenSubject(subject.id); onClose(); }}
+                onClick={() => { onOpenSubject(subject.id, target.section); onClose(); }}
                 className="text-xs px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-500 transition-colors"
               >
                 Open {subject.name} →

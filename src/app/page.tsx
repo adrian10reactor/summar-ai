@@ -9,7 +9,7 @@ import CrossChatView from "@/components/CrossChatView";
 
 type Active =
   | { kind: "home" }
-  | { kind: "subject"; id: string }
+  | { kind: "subject"; id: string; targetSection?: string }
   | { kind: "cross-chat"; id: string };
 
 export default function Home() {
@@ -88,7 +88,8 @@ export default function Home() {
           onBack={() => setActive({ kind: "home" })}
           onResetCredits={handleResetCredits}
           onDelete={() => { handleDelete(s.id); setActive({ kind: "home" }); }}
-          onOpenOtherSubject={(id) => setActive({ kind: "subject", id })}
+          onOpenOtherSubject={(id, section) => setActive({ kind: "subject", id, targetSection: section })}
+          initialTargetSection={active.targetSection}
         />
       );
     }

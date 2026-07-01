@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import { Subject } from "@/types";
 import { saveStudyGuide } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
@@ -73,6 +73,7 @@ export default function StudyGuideTab({
   onAskAbout,
   imageLookup,
   onCrossRefClick,
+  jumpTarget,
 }: {
   subject: Subject;
   getMaterials: () => { type: string; data: string; name: string }[];
@@ -83,6 +84,7 @@ export default function StudyGuideTab({
   onAskAbout: (payload: { message: string; chatName: string }) => void;
   imageLookup: ImageLookup;
   onCrossRefClick?: (target: { subjectId: string; section?: string }) => void;
+  jumpTarget?: { section: string; nonce: number } | null;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -93,6 +95,46 @@ export default function StudyGuideTab({
 
   const existing = subject.content.studyGuide;
   const sections = useMemo(() => existing ? splitIntoSections(existing.html) : [], [existing]);
+
+  // React to jump-target changes (opened via a cross-subject link). We resolve
+  // to the best-matching h2 (activeIdx) and h3 (activeSubIdx) so the reader
+  // lands right on the section their link pointed at.
+  useEffect(() => {
+    if (!jumpTarget || sections.length === 0) return;
+    const raw = jumpTarget.section.trim();
+    if (!raw) return;
+    const parts = raw.split(/\s*(?:→|->|>)\s*/).map((p) => p.trim().toLowerCase()).filter(Boolean);
+    const wantParent = parts.length > 1 ? parts[0] : "";
+    const wantChild = parts[parts.length - 1] || "";
+    const wantAny = raw.toLowerCase();
+
+    const matchByChild = sections.findIndex((s) =>
+      s.subsections.some((sub) => sub.title.toLowerCase().includes(wantChild))
+    );
+    const matchByParent = wantParent
+      ? sections.findIndex((s) => s.title.toLowerCase().includes(wantParent))
+      : -1;
+    const matchByH2Only = sections.findIndex((s) => s.title.toLowerCase().includes(wantAny));
+
+    let sectionIdx = -1;
+    if (parts.length > 1 && matchByParent >= 0) {
+      sectionIdx = matchByParent;
+    } else if (matchByChild >= 0) {
+      sectionIdx = matchByChild;
+    } else if (matchByH2Only >= 0) {
+      sectionIdx = matchByH2Only;
+    }
+    if (sectionIdx < 0) return;
+    setActiveIdx(sectionIdx);
+    const subIdx = sections[sectionIdx].subsections.findIndex((sub) =>
+      sub.title.toLowerCase().includes(wantChild)
+    );
+    setActiveSubIdx(subIdx >= 0 ? subIdx : 0);
+    // Scroll the top of the active area into view so the user actually sees it.
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 50);
+  }, [jumpTarget, sections]);
 
   const handleGenerate = async () => {
     const materials = getMaterials();

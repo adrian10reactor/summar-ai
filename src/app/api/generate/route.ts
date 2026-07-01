@@ -21,8 +21,9 @@ RICH VISUALS — use whichever fits best. All render natively in the app:
 
 1) MATH — always typeset math with LaTeX inside $...$ (inline) or $$...$$ (display).
    Write bare dollar delimiters — NOT escaped like \\$ or \\\\$. Just $x^2$ and $$\\int f(x)dx$$.
-   NEVER wrap math inside <pre>, <code>, or a code block — math delimiters go INLINE in normal prose, not inside code formatting.
-   NEVER write formulas as plain text like "E = m*c^2" — always use $E = mc^2$ or $$E = mc^2$$.
+   NEVER wrap math inside <pre>, <code>, or a code block — those tags are for computer code (Python, C++, shell) ONLY. Do NOT use them for formulas, definitions, derivations, or any mathematical expression.
+   NEVER write formulas as plain text like "E = m*c^2" or "f'(x) = lim(h→0) [f(x+h) - f(x)] / h" — always convert to LaTeX: $E = mc^2$, or for the derivative definition: $$f'(x) = \\lim_{h \\to 0} \\frac{f(x+h) - f(x)}{h}$$.
+   RULE OF THUMB: if the "code" you're about to put in a <pre> block contains math operators (=, +, -, *, /, ^, ∫, ∑, √, →, greek letters, sub/superscripts) but is NOT actual programming syntax, it belongs in $$...$$ math instead.
    Applies to ALL subjects: physics, chemistry, statistics, econ, linguistics IPA, music theory, whatever.
 
 2) STRUCTURED DIAGRAMS via Mermaid — wrap in <div class="mermaid">…</div>. Great for:
