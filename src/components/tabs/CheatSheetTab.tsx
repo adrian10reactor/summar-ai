@@ -13,6 +13,7 @@ export default function CheatSheetTab(props: {
   onCost: (amount: number, action: string) => void;
   onUpdated: () => void;
   imageLookup: ImageLookup;
+  onCrossRefClick?: (target: { subjectId: string; section?: string }) => void;
 }) {
   return (
     <HtmlContentTab

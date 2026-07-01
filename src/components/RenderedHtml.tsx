@@ -79,6 +79,7 @@ export default function RenderedHtml({
   onMouseUp,
   onScroll,
   innerRef,
+  onCrossRefClick,
 }: {
   html: string;
   subject: Subject;
@@ -87,15 +88,39 @@ export default function RenderedHtml({
   onMouseUp?: () => void;
   onScroll?: () => void;
   innerRef?: React.Ref<HTMLDivElement>;
+  onCrossRefClick?: (target: { subjectId: string; section?: string }) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const processed = useMemo(() => swapMaterialImages(html, subject, imageLookup), [html, subject, imageLookup]);
+  const processed = useMemo(() => {
+    let out = swapMaterialImages(html, subject, imageLookup);
+    // Style cross-subject reference links as pill buttons inline.
+    out = out.replace(
+      /<a\b([^>]*)\bdata-subject-ref="([^"]+)"([^>]*)>([\s\S]*?)<\/a>/gi,
+      (_m, before, subjectId, after, inner) => {
+        const sectionMatch = (before + after).match(/\bdata-section="([^"]*)"/i);
+        const section = sectionMatch ? sectionMatch[1] : "";
+        return `<a href="#" data-subject-ref="${subjectId}" data-section="${section}" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border border-violet-500/40 bg-violet-500/10 text-violet-300 hover:bg-violet-500/20 hover:text-violet-200 no-underline text-xs mx-0.5 align-baseline">🔗 ${inner}</a>`;
+      }
+    );
+    return out;
+  }, [html, subject, imageLookup]);
 
   useEffect(() => {
     if (!ref.current) return;
     renderMath(ref.current);
     renderMermaid(ref.current);
   }, [processed]);
+
+  const handleClick: React.MouseEventHandler<HTMLDivElement> = (e) => {
+    if (!onCrossRefClick) return;
+    const target = (e.target as HTMLElement).closest("[data-subject-ref]") as HTMLElement | null;
+    if (!target) return;
+    e.preventDefault();
+    const subjectId = target.getAttribute("data-subject-ref");
+    if (!subjectId) return;
+    const section = target.getAttribute("data-section") || undefined;
+    onCrossRefClick({ subjectId, section });
+  };
 
   const combinedRef = (node: HTMLDivElement | null) => {
     ref.current = node;
@@ -111,6 +136,7 @@ export default function RenderedHtml({
       className={className}
       onMouseUp={onMouseUp}
       onScroll={onScroll}
+      onClick={onCrossRefClick ? handleClick : undefined}
       dangerouslySetInnerHTML={{ __html: processed }}
     />
   );

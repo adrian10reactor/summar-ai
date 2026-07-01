@@ -11,6 +11,8 @@ import ChatTab from "./tabs/ChatTab";
 import CustomSectionTab from "./tabs/CustomSectionTab";
 import { ImageLookup } from "@/lib/render";
 import { useGeneration } from "@/lib/useGeneration";
+import CrossRefModal, { CrossRefTarget } from "./CrossRefModal";
+import { getSubjects } from "@/lib/storage";
 
 type TabKey = SubjectTab | { kind: "custom"; id: string };
 
@@ -44,6 +46,7 @@ export default function SubjectView({
   onBack,
   onResetCredits,
   onDelete,
+  onOpenOtherSubject,
 }: {
   subject: Subject;
   balance: number;
@@ -51,11 +54,13 @@ export default function SubjectView({
   onBack: () => void;
   onResetCredits: () => void;
   onDelete: () => void;
+  onOpenOtherSubject?: (subjectId: string) => void;
 }) {
   const [tab, setTab] = useState<TabKey>("materials");
   const [lastCost, setLastCost] = useState<{ amount: number; action: string } | null>(null);
   const [chatLaunch, setChatLaunch] = useState<{ message: string; chatName: string; nonce: number; attachments?: ChatAttachment[] } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [crossRef, setCrossRef] = useState<CrossRefTarget | null>(null);
   const pdfDataRef = useRef<Map<string, string>>(new Map());
   // Client-side blob URLs for rendering images inline. Keyed by materialId for standalone
   // images, or `${materialId}::${pageNum}` for rasterized PDF pages.
@@ -335,6 +340,7 @@ export default function SubjectView({
               onUpdated={onSubjectUpdated}
               onAskAbout={handleAskAboutText}
               imageLookup={imageLookup}
+              onCrossRefClick={setCrossRef}
             />
           )}
           {tab === "quiz" && (
@@ -356,6 +362,7 @@ export default function SubjectView({
               onCost={handleCostIncurred}
               onUpdated={onSubjectUpdated}
               imageLookup={imageLookup}
+              onCrossRefClick={setCrossRef}
             />
           )}
           {tab === "exam-prep" && (
@@ -367,6 +374,7 @@ export default function SubjectView({
               onCost={handleCostIncurred}
               onUpdated={onSubjectUpdated}
               imageLookup={imageLookup}
+              onCrossRefClick={setCrossRef}
             />
           )}
           {tab === "chat" && (
@@ -388,6 +396,7 @@ export default function SubjectView({
               subject={subject}
               section={activeCustomSection}
               imageLookup={imageLookup}
+              onCrossRefClick={setCrossRef}
               getMaterials={getMaterialsForApi}
               hasLoadedMaterials={hasLoadedMaterials}
               hasMaterials={hasMaterials}
@@ -398,6 +407,16 @@ export default function SubjectView({
           )}
         </div>
       </div>
+
+      {crossRef && (
+        <CrossRefModal
+          target={crossRef}
+          subjects={getSubjects()}
+          imageLookup={imageLookup}
+          onClose={() => setCrossRef(null)}
+          onOpenSubject={(id) => { onOpenOtherSubject?.(id); }}
+        />
+      )}
     </div>
   );
 }

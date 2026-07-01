@@ -88,6 +88,7 @@ export default function Home() {
           onBack={() => setActive({ kind: "home" })}
           onResetCredits={handleResetCredits}
           onDelete={() => { handleDelete(s.id); setActive({ kind: "home" }); }}
+          onOpenOtherSubject={(id) => setActive({ kind: "subject", id })}
         />
       );
     }

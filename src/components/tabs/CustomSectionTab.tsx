@@ -18,6 +18,7 @@ export default function CustomSectionTab({
   onUpdated,
   onDeleted,
   imageLookup,
+  onCrossRefClick,
 }: {
   subject: Subject;
   section: CustomSection;
@@ -28,6 +29,7 @@ export default function CustomSectionTab({
   onUpdated: () => void;
   onDeleted: () => void;
   imageLookup: ImageLookup;
+  onCrossRefClick?: (target: { subjectId: string; section?: string }) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -169,6 +171,7 @@ export default function CustomSectionTab({
         html={section.html}
         subject={subject}
         imageLookup={imageLookup}
+        onCrossRefClick={onCrossRefClick}
         className="prose prose-invert prose-sm max-w-none
           bg-zinc-900 border border-zinc-800 rounded-xl p-6
           [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-violet-300 [&_h2]:mt-8 [&_h2]:mb-4 [&_h2]:first:mt-0

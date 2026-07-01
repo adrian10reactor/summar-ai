@@ -22,6 +22,7 @@ export default function HtmlContentTab({
   onCost,
   onUpdated,
   imageLookup,
+  onCrossRefClick,
 }: {
   subject: Subject;
   contentKey: "studyGuide" | "cheatSheet" | "examPrep";
@@ -36,6 +37,7 @@ export default function HtmlContentTab({
   onCost: (amount: number, action: string) => void;
   onUpdated: () => void;
   imageLookup: ImageLookup;
+  onCrossRefClick?: (target: { subjectId: string; section?: string }) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -119,6 +121,7 @@ export default function HtmlContentTab({
         html={existing.html}
         subject={subject}
         imageLookup={imageLookup}
+        onCrossRefClick={onCrossRefClick}
         className="prose prose-invert prose-sm max-w-none
           bg-zinc-900 border border-zinc-800 rounded-xl p-6
           [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-violet-300 [&_h2]:mt-8 [&_h2]:mb-4 [&_h2]:first:mt-0

@@ -4,9 +4,11 @@ import { useState } from "react";
 import { Subject, Quiz, Question } from "@/types";
 import {
   saveStudyGuide, saveCheatSheet, saveExamPrep, saveQuizToSubject, saveCustomSectionHtml,
+  getSubjects,
 } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
 import { parseApiResponse } from "@/lib/api";
+import { extractSubjectTopics } from "@/lib/render";
 
 export type BatchItemState = "queued" | "generating" | "done" | "error";
 export interface BatchItem {
@@ -49,9 +51,15 @@ export function useGeneration(
     setStatusText(`Analyzing ${materials.length} material${materials.length !== 1 ? "s" : ""}...`);
 
     try {
+      const otherSubjects = getSubjects()
+        .filter((s) => s.id !== subject.id)
+        .map((s) => ({ id: s.id, name: s.name, topics: extractSubjectTopics(s) }))
+        .filter((s) => s.topics.length > 0);
+
       const body: Record<string, unknown> = { mode, materials };
       if (opts?.customPrompt?.trim()) body.customPrompt = opts.customPrompt.trim();
       if (opts?.customSectionPrompt) body.customSectionPrompt = opts.customSectionPrompt;
+      if (otherSubjects.length > 0) body.otherSubjects = otherSubjects;
 
       const res = await fetch("/api/generate", {
         method: "POST",

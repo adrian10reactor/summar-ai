@@ -239,6 +239,7 @@ export async function POST(req: NextRequest) {
       materials = [],
       customPrompt = "",
       customSectionPrompt = "",
+      otherSubjects = [],
     } = body as {
       mode: Mode;
       materials: {
@@ -249,6 +250,7 @@ export async function POST(req: NextRequest) {
       }[];
       customPrompt?: string;
       customSectionPrompt?: string;
+      otherSubjects?: { id: string; name: string; topics: string[] }[];
     };
 
     if (materials.length === 0) {
@@ -311,6 +313,24 @@ export async function POST(req: NextRequest) {
         lines.push("Only reference a page when it contains a diagram / figure / table / equation worth showing in the study material — do not embed pure-text pages.");
       }
       lines.push("\nPlace each image at the natural point in the surrounding prose. Do not repeat the same image.");
+      prompt += lines.join("\n");
+    }
+
+    // Cross-subject links — tell the model about the user's OTHER subjects and
+    // let it insert links when a concept in this material is covered in another.
+    if (mode !== "quiz" && otherSubjects.length > 0) {
+      const lines: string[] = [];
+      lines.push("\n\nCROSS-SUBJECT LINKS:");
+      lines.push("The student has these OTHER subjects (not being generated now) with the following top-level topics:");
+      for (const s of otherSubjects) {
+        const topicList = s.topics.length > 0 ? s.topics.join(", ") : "(no study guide yet)";
+        lines.push(`- id="${s.id}" name="${s.name}" topics: ${topicList}`);
+      }
+      lines.push("");
+      lines.push("Whenever THIS material relies on a concept clearly owned by another subject, add a small link inline:");
+      lines.push('  <a data-subject-ref="OTHER_SUBJECT_ID" data-section="TOPIC_NAME">Covered in <em>Other Subject Name</em> → <em>Topic Name</em></a>');
+      lines.push('For example, if a Parallel Programming study guide mentions "we take the derivative to find the peak speedup", add: <a data-subject-ref="MATH_ID" data-section="Derivatives">Derivatives are covered in <em>Math</em></a>');
+      lines.push("Only link when the referenced topic exists in the topics list above. Do NOT invent topics. Use these sparingly (1-2 per subsection at most), only where the connection genuinely helps the student.");
       prompt += lines.join("\n");
     }
 

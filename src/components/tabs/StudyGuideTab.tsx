@@ -72,6 +72,7 @@ export default function StudyGuideTab({
   onUpdated,
   onAskAbout,
   imageLookup,
+  onCrossRefClick,
 }: {
   subject: Subject;
   getMaterials: () => { type: string; data: string; name: string }[];
@@ -81,6 +82,7 @@ export default function StudyGuideTab({
   onUpdated: () => void;
   onAskAbout: (payload: { message: string; chatName: string }) => void;
   imageLookup: ImageLookup;
+  onCrossRefClick?: (target: { subjectId: string; section?: string }) => void;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -295,6 +297,7 @@ export default function StudyGuideTab({
               html={bodyHtml}
               subject={subject}
               imageLookup={imageLookup}
+              onCrossRefClick={onCrossRefClick}
               onMouseUp={handleMouseUp}
               onScroll={handleScroll}
               className="prose prose-invert prose-sm max-w-none

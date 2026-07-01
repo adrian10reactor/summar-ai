@@ -1,5 +1,20 @@
 import { Subject } from "@/types";
 
+// Pull the top-level topics (h2 headings) out of a subject's generated
+// study guide so we can advertise them to the model for cross-subject links.
+export function extractSubjectTopics(subject: Subject): string[] {
+  const html = subject.content.studyGuide?.html;
+  if (!html) return [];
+  if (typeof window === "undefined") {
+    // Server-side fallback: regex h2s.
+    const matches = html.match(/<h2[^>]*>([^<]+)<\/h2>/gi) || [];
+    return matches.map((m) => m.replace(/<[^>]+>/g, "").trim()).filter(Boolean);
+  }
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
+  return Array.from(doc.querySelectorAll("h2")).map((h) => (h.textContent || "").trim()).filter(Boolean);
+}
+
 const PLACEHOLDER_HTML = `<div style="border:1px dashed #52525b;padding:14px;border-radius:6px;color:#a1a1aa;font-size:12px;margin:8px 0">
   <strong style="color:#e4e4e7">Image unavailable.</strong>
   Re-upload the material to display this figure.
