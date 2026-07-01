@@ -16,6 +16,36 @@ const MODELS = [
 
 type Mode = "quiz" | "study-guide" | "cheat-sheet" | "exam-prep" | "custom";
 
+const RICH_VISUALS = `
+RICH VISUALS — use whichever fits best. All render natively in the app:
+
+1) MATH — always typeset math with LaTeX inside \\$...\\$ (inline) or \\$\\$...\\$\\$ (display).
+   NEVER write formulas as plain text like "E = m*c^2" — always use \\$E = mc^2\\$ or \\$\\$E = mc^2\\$\\$.
+   Applies to ALL subjects: physics, chemistry, statistics, econ, linguistics IPA, music theory, whatever.
+
+2) STRUCTURED DIAGRAMS via Mermaid — wrap in <div class="mermaid">…</div>. Great for:
+   - flowcharts (algorithm steps, decision trees)
+   - state diagrams (finite automata, game states, protocol states)
+   - sequence diagrams (network protocols, method calls, conversations)
+   - class diagrams (OOP hierarchies, biology taxonomies, family trees)
+   - ER diagrams (databases, relationships)
+   - timelines / gantt (history, project plans)
+   - mindmaps (concept maps)
+   Example: <div class="mermaid">flowchart TD; A[Start] --> B{Decision}; B -->|yes| C; B -->|no| D</div>
+
+3) FREEFORM SVG SKETCHES — inline <svg viewBox="0 0 W H" xmlns="http://www.w3.org/2000/svg">…</svg>.
+   Use when a spatial diagram is called for and the numeric values from the problem matter:
+   - physics: free-body force diagrams (arrows for gravity, normal force, tension, friction), projectile motion with initial velocity vector and trajectory, ray optics with mirrors/lenses/rays, circuits, wave diagrams
+   - math: geometry constructions with labeled sides/angles, coordinate systems with plotted points/functions, vector operations, number lines
+   - chemistry: molecular structures, reaction arrows, energy diagrams
+   - biology: labeled anatomy, food webs
+   Bake actual values from the problem into <text> labels (e.g. "v₀ = 20 m/s", "h = 45 m", "θ = 30°").
+   Use stroke="#a78bfa" for main lines, stroke="#e4e4e7" for axes/reference, fill="#e4e4e7" for text, define arrowhead <marker> once and reuse.
+   Give the SVG a viewBox that fits the drawing so it scales. Keep it clean, not photorealistic.
+
+Pick the right tool: use Mermaid for structured/logical graphs, SVG for spatial/quantitative sketches, math delimiters for any equation.
+`;
+
 function buildPrompt(mode: Mode, fileCount: number, customSectionPrompt?: string): string {
   const plural = fileCount > 1 ? "s" : "";
   const multiNote = fileCount > 1
@@ -75,6 +105,8 @@ OUTPUT FORMAT:
 - Use these HTML elements: <h2>, <h3>, <h4>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <code>, <pre>, <blockquote>, <table>, <tr>, <th>, <td>, <hr>, <div>
 - Do NOT include <html>, <head>, <body>, <style> tags
 
+${RICH_VISUALS}
+
 Start directly with the first <h2> tag. Do NOT start with any preamble text.`;
   }
 
@@ -90,8 +122,10 @@ Rules:
 - Use tables for structured data
 - This should be something a student prints on 1-2 pages before an exam
 - Output ONLY valid HTML (no markdown, no code fences, no wrapping)
-- Use these HTML elements: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <code>, <pre>, <table>, <tr>, <th>, <td>, <hr>
+- Use these HTML elements: <h2>, <h3>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <code>, <pre>, <table>, <tr>, <th>, <td>, <hr>, <div>, <svg>
 - Do NOT include <html>, <head>, <body>, <style> tags
+
+${RICH_VISUALS}
 
 Start directly with the HTML content.`;
   }
@@ -110,6 +144,8 @@ Rules:
 - Use styled boxes where appropriate: tip <div style="background:#1a2e1a;border-left:3px solid #7ee787;border-radius:6px;padding:10px 14px;margin:10px 0">, example <div style="background:#1e222e;border-left:3px solid #5b9dff;border-radius:6px;padding:10px 14px;margin:10px 0">, warning <div style="background:#2e1a1a;border-left:3px solid #ff7b72;border-radius:6px;padding:10px 14px;margin:10px 0">
 - Do NOT include <html>, <head>, <body>, <style> tags
 - Be thorough and detailed
+
+${RICH_VISUALS}
 
 Start directly with the HTML content.`;
   }
@@ -131,6 +167,9 @@ Rules:
 - Use these HTML elements: <h2>, <h3>, <h4>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <code>, <pre>, <blockquote>, <table>, <tr>, <th>, <td>, <hr>, <details>, <summary>
 - Use <details><summary>Show Answer</summary>...</details> for model answers so students can test themselves
 - Do NOT include <html>, <head>, <body>, <style> tags
+- For problems involving physics forces, projectile motion, geometry, circuits, ray optics, etc., include an inline SVG sketch of the setup with the exact numbers from the problem baked into <text> labels — this is often what makes the answer clickable
+
+${RICH_VISUALS}
 
 Start directly with the HTML content.`;
 }

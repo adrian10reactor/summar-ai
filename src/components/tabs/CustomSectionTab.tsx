@@ -5,7 +5,8 @@ import { Subject, CustomSection } from "@/types";
 import { saveCustomSectionHtml, deleteCustomSection, updateCustomSection } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
 import { parseApiResponse } from "@/lib/api";
-import { ImageLookup, swapMaterialImages } from "@/lib/render";
+import { ImageLookup } from "@/lib/render";
+import RenderedHtml from "../RenderedHtml";
 
 export default function CustomSectionTab({
   subject,
@@ -164,7 +165,10 @@ export default function CustomSectionTab({
 
       {error && <p className="text-red-400 text-sm bg-red-950/30 rounded-lg px-4 py-3">{error}</p>}
 
-      <div
+      <RenderedHtml
+        html={section.html}
+        subject={subject}
+        imageLookup={imageLookup}
         className="prose prose-invert prose-sm max-w-none
           bg-zinc-900 border border-zinc-800 rounded-xl p-6
           [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-violet-300 [&_h2]:mt-8 [&_h2]:mb-4 [&_h2]:first:mt-0
@@ -178,8 +182,9 @@ export default function CustomSectionTab({
           [&_blockquote]:border-l-4 [&_blockquote]:border-violet-500 [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:text-zinc-400
           [&_table]:w-full [&_th]:bg-zinc-800 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-zinc-200 [&_th]:text-sm
           [&_td]:px-3 [&_td]:py-2 [&_td]:border-t [&_td]:border-zinc-800 [&_td]:text-zinc-300 [&_td]:text-sm
-          [&_hr]:border-zinc-800 [&_hr]:my-6"
-        dangerouslySetInnerHTML={{ __html: swapMaterialImages(section.html, subject, imageLookup) }}
+          [&_hr]:border-zinc-800 [&_hr]:my-6
+          [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:my-4 [&_svg]:bg-zinc-950 [&_svg]:rounded-lg [&_svg]:p-3
+          [&_.mermaid]:my-4 [&_.mermaid]:bg-zinc-950 [&_.mermaid]:rounded-lg [&_.mermaid]:p-3 [&_.mermaid]:overflow-x-auto"
       />
     </div>
   );

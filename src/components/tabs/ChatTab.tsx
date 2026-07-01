@@ -5,7 +5,8 @@ import { Subject, ChatMessage, ChatAttachment } from "@/types";
 import { createChat, deleteChat, saveChatMessages, renameChat } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
 import { parseApiResponse } from "@/lib/api";
-import { ImageLookup, swapMaterialImages } from "@/lib/render";
+import { ImageLookup } from "@/lib/render";
+import RenderedHtml from "../RenderedHtml";
 
 export default function ChatTab({
   subject,
@@ -391,15 +392,19 @@ export default function ChatTab({
               {msg.role === "user" ? (
                 msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>
               ) : (
-                <div
+                <RenderedHtml
+                  html={msg.content}
+                  subject={subject}
+                  imageLookup={imageLookup}
                   className="[&_p]:mb-2 [&_p]:last:mb-0 [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_h3]:mb-2
                     [&_h4]:font-medium [&_h4]:text-zinc-200 [&_h4]:mb-1
                     [&_ul]:ml-4 [&_ul]:list-disc [&_ol]:ml-4 [&_ol]:list-decimal
                     [&_li]:mb-1 [&_strong]:text-zinc-100
                     [&_code]:bg-zinc-800 [&_code]:px-1 [&_code]:rounded [&_code]:text-violet-300 [&_code]:text-xs
                     [&_pre]:bg-zinc-950 [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:my-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0
-                    [&_blockquote]:border-l-2 [&_blockquote]:border-violet-500 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-zinc-400"
-                  dangerouslySetInnerHTML={{ __html: swapMaterialImages(msg.content, subject, imageLookup) }}
+                    [&_blockquote]:border-l-2 [&_blockquote]:border-violet-500 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-zinc-400
+                    [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:my-3 [&_svg]:bg-zinc-950 [&_svg]:rounded-lg [&_svg]:p-2
+                    [&_.mermaid]:my-3 [&_.mermaid]:bg-zinc-950 [&_.mermaid]:rounded-lg [&_.mermaid]:p-2 [&_.mermaid]:overflow-x-auto"
                 />
               )}
             </div>
