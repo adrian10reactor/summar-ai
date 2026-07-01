@@ -24,10 +24,12 @@ export async function POST(req: NextRequest) {
       message,
       history = [],
       materials = [],
+      attachments = [],
     } = body as {
       message: string;
       history: { role: "user" | "assistant"; content: string }[];
       materials: { type: string; data: string; name: string; uri?: string; mimeType?: string }[];
+      attachments?: { name: string; mimeType: string; uri?: string; data?: string }[];
     };
 
     const materialParts: Part[] = [];
@@ -43,12 +45,30 @@ export async function POST(req: NextRequest) {
           continue;
         }
         materialNames.push(mat.name);
+      } else if (mat.type === "image") {
+        if (mat.uri) {
+          materialParts.push({ fileData: { mimeType: mat.mimeType || "image/png", fileUri: mat.uri } });
+        } else if (mat.data) {
+          materialParts.push({ inlineData: { mimeType: mat.mimeType || "image/png", data: mat.data } });
+        } else {
+          continue;
+        }
+        materialNames.push(mat.name);
       } else if (mat.type === "text") {
         materialParts.push({ text: `[Study notes - "${mat.name}"]:\n${mat.data}\n` });
         materialNames.push(mat.name);
       } else if (mat.type === "link") {
         materialParts.push({ text: `[Reference link: ${mat.data}]\n` });
         materialNames.push(mat.name);
+      }
+    }
+
+    const attachmentParts: Part[] = [];
+    for (const att of attachments) {
+      if (att.uri) {
+        attachmentParts.push({ fileData: { mimeType: att.mimeType || "image/png", fileUri: att.uri } });
+      } else if (att.data) {
+        attachmentParts.push({ inlineData: { mimeType: att.mimeType || "image/png", data: att.data } });
       }
     }
 
@@ -91,7 +111,9 @@ Your job is to help them learn and understand the material. When answering:
           ],
         });
 
-        const result = await chat.sendMessage(message);
+        const result = attachmentParts.length > 0
+          ? await chat.sendMessage([{ text: message }, ...attachmentParts])
+          : await chat.sendMessage(message);
         const text = result.response.text();
         const usage = result.response.usageMetadata;
 

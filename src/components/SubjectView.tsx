@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Subject, SubjectTab } from "@/types";
+import { Subject, SubjectTab, ChatAttachment } from "@/types";
 import MaterialsTab from "./tabs/MaterialsTab";
 import StudyGuideTab from "./tabs/StudyGuideTab";
 import QuizTab from "./tabs/QuizTab";
@@ -9,6 +9,7 @@ import CheatSheetTab from "./tabs/CheatSheetTab";
 import ExamPrepTab from "./tabs/ExamPrepTab";
 import ChatTab from "./tabs/ChatTab";
 import CustomSectionTab from "./tabs/CustomSectionTab";
+import { ImageLookup } from "@/lib/render";
 
 type TabKey = SubjectTab | { kind: "custom"; id: string };
 
@@ -52,9 +53,19 @@ export default function SubjectView({
 }) {
   const [tab, setTab] = useState<TabKey>("materials");
   const [lastCost, setLastCost] = useState<{ amount: number; action: string } | null>(null);
-  const [chatLaunch, setChatLaunch] = useState<{ message: string; chatName: string; nonce: number } | null>(null);
+  const [chatLaunch, setChatLaunch] = useState<{ message: string; chatName: string; nonce: number; attachments?: ChatAttachment[] } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pdfDataRef = useRef<Map<string, string>>(new Map());
+  // Client-side blob URLs for rendering images inline. Keyed by materialId for standalone
+  // images, or `${materialId}::${pageNum}` for rasterized PDF pages.
+  const imageBlobRef = useRef<Map<string, string>>(new Map());
+
+  const imageLookup: ImageLookup = {
+    getUrl: (materialId, pageNum) => {
+      const key = pageNum !== undefined ? `${materialId}::${pageNum}` : materialId;
+      return imageBlobRef.current.get(key);
+    },
+  };
 
   const selectTab = (next: TabKey) => {
     setTab(next);
@@ -62,17 +73,27 @@ export default function SubjectView({
   };
 
   const getMaterialsForApi = () => {
-    const out: { type: string; data: string; name: string; uri?: string; mimeType?: string }[] = [];
+    const out: { type: string; data: string; name: string; id?: string; uri?: string; mimeType?: string; pageUris?: { pageNum: number; uri: string; mimeType: string }[]; pageCount?: number }[] = [];
     for (const m of subject.materials) {
       if (m.type === "pdf") {
         if (m.uri) {
-          out.push({ type: "pdf", data: "", name: m.name, uri: m.uri, mimeType: m.mimeType || "application/pdf" });
+          out.push({
+            type: "pdf", data: "", name: m.name, id: m.id,
+            uri: m.uri, mimeType: m.mimeType || "application/pdf",
+            pageUris: m.pageUris, pageCount: m.pageCount,
+          });
         } else {
           const base64 = pdfDataRef.current.get(m.id);
-          if (base64) out.push({ type: "pdf", data: base64, name: m.name });
+          if (base64) out.push({ type: "pdf", data: base64, name: m.name, id: m.id });
+        }
+      } else if (m.type === "image") {
+        if (m.uri) {
+          out.push({ type: "image", data: "", name: m.name, id: m.id, uri: m.uri, mimeType: m.mimeType || "image/png" });
+        } else if (m.data) {
+          out.push({ type: "image", data: m.data, name: m.name, id: m.id, mimeType: m.mimeType || "image/png" });
         }
       } else if (m.data) {
-        out.push({ type: m.type, data: m.data, name: m.name });
+        out.push({ type: m.type, data: m.data, name: m.name, id: m.id });
       }
     }
     return out;
@@ -246,6 +267,7 @@ export default function SubjectView({
             <MaterialsTab
               subject={subject}
               pdfDataRef={pdfDataRef}
+              imageBlobRef={imageBlobRef}
               getMaterials={getMaterialsForApi}
               hasLoadedMaterials={hasLoadedMaterials}
               hasMaterials={hasMaterials}
@@ -263,6 +285,7 @@ export default function SubjectView({
               onCost={handleCostIncurred}
               onUpdated={onSubjectUpdated}
               onAskAbout={handleAskAboutText}
+              imageLookup={imageLookup}
             />
           )}
           {tab === "quiz" && (
@@ -283,6 +306,7 @@ export default function SubjectView({
               hasMaterials={hasMaterials}
               onCost={handleCostIncurred}
               onUpdated={onSubjectUpdated}
+              imageLookup={imageLookup}
             />
           )}
           {tab === "exam-prep" && (
@@ -293,6 +317,7 @@ export default function SubjectView({
               hasMaterials={hasMaterials}
               onCost={handleCostIncurred}
               onUpdated={onSubjectUpdated}
+              imageLookup={imageLookup}
             />
           )}
           {tab === "chat" && (
@@ -305,12 +330,15 @@ export default function SubjectView({
               onUpdated={onSubjectUpdated}
               launch={chatLaunch}
               onLaunchConsumed={() => setChatLaunch(null)}
+              imageLookup={imageLookup}
+              imageBlobRef={imageBlobRef}
             />
           )}
           {activeCustomSection && (
             <CustomSectionTab
               subject={subject}
               section={activeCustomSection}
+              imageLookup={imageLookup}
               getMaterials={getMaterialsForApi}
               hasLoadedMaterials={hasLoadedMaterials}
               hasMaterials={hasMaterials}

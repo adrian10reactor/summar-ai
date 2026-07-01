@@ -198,7 +198,12 @@ export async function POST(req: NextRequest) {
       customSectionPrompt = "",
     } = body as {
       mode: Mode;
-      materials: { type: string; data: string; name: string; uri?: string; mimeType?: string }[];
+      materials: {
+        type: string; data: string; name: string;
+        id?: string; uri?: string; mimeType?: string;
+        pageUris?: { pageNum: number; uri: string; mimeType: string }[];
+        pageCount?: number;
+      }[];
       customPrompt?: string;
       customSectionPrompt?: string;
     };
@@ -209,6 +214,8 @@ export async function POST(req: NextRequest) {
 
     const parts: Part[] = [];
     let fileCount = 0;
+    const imageMaterials: { id: string; name: string }[] = [];
+    const pageMaterials: { id: string; name: string; pageCount: number }[] = [];
 
     for (const mat of materials) {
       if (mat.type === "pdf") {
@@ -220,6 +227,20 @@ export async function POST(req: NextRequest) {
           continue;
         }
         fileCount++;
+        const pc = mat.pageCount ?? mat.pageUris?.length ?? 0;
+        if (mat.id && pc > 0) {
+          pageMaterials.push({ id: mat.id, name: mat.name, pageCount: pc });
+        }
+      } else if (mat.type === "image") {
+        if (mat.uri) {
+          parts.push({ fileData: { mimeType: mat.mimeType || "image/png", fileUri: mat.uri } });
+        } else if (mat.data) {
+          parts.push({ inlineData: { mimeType: mat.mimeType || "image/png", data: mat.data } });
+        } else {
+          continue;
+        }
+        fileCount++;
+        if (mat.id) imageMaterials.push({ id: mat.id, name: mat.name });
       } else if (mat.type === "link") {
         parts.push({ text: `[Reference link: ${mat.data}]\n` });
         fileCount++;
@@ -230,6 +251,26 @@ export async function POST(req: NextRequest) {
     }
 
     let prompt = buildPrompt(mode, fileCount, customSectionPrompt);
+
+    // Visual asset instructions — only applies to HTML modes, not quiz.
+    if (mode !== "quiz" && (imageMaterials.length > 0 || pageMaterials.length > 0)) {
+      const lines: string[] = [];
+      lines.push("\n\nVISUAL ASSETS YOU CAN INCLUDE IN THE OUTPUT:");
+      if (imageMaterials.length > 0) {
+        lines.push("\nStandalone images the user uploaded (reference by id):");
+        for (const im of imageMaterials) lines.push(`- id="${im.id}" name="${im.name}"`);
+        lines.push('Embed with: <img data-material="ID" alt="short caption">');
+      }
+      if (pageMaterials.length > 0) {
+        lines.push("\nPDF pages available as figures (reference by material id + 1-indexed page number):");
+        for (const pm of pageMaterials) lines.push(`- id="${pm.id}" name="${pm.name}" pages=${pm.pageCount}`);
+        lines.push('Embed with: <img data-material="ID" data-page="N" alt="short caption">');
+        lines.push("Only reference a page when it contains a diagram / figure / table / equation worth showing in the study material — do not embed pure-text pages.");
+      }
+      lines.push("\nPlace each image at the natural point in the surrounding prose. Do not repeat the same image.");
+      prompt += lines.join("\n");
+    }
+
     if (customPrompt) {
       prompt += `\n\nADDITIONAL USER INSTRUCTIONS: ${customPrompt}`;
     }

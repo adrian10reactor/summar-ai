@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, MutableRefObject } from "react";
-import { Subject, SubjectTab, Quiz } from "@/types";
+import { Subject, SubjectTab, Quiz, Material } from "@/types";
 import {
   addMaterial, removeMaterial, updateMaterial,
   saveStudyGuide, saveCheatSheet, saveExamPrep, saveQuizToSubject,
@@ -22,6 +22,7 @@ type NavTarget = SubjectTab | { kind: "custom"; id: string };
 export default function MaterialsTab({
   subject,
   pdfDataRef,
+  imageBlobRef,
   getMaterials,
   hasLoadedMaterials,
   hasMaterials,
@@ -31,6 +32,7 @@ export default function MaterialsTab({
 }: {
   subject: Subject;
   pdfDataRef: MutableRefObject<Map<string, string>>;
+  imageBlobRef: MutableRefObject<Map<string, string>>;
   getMaterials: () => { type: string; data: string; name: string }[];
   hasLoadedMaterials: boolean;
   hasMaterials: boolean;
@@ -38,13 +40,14 @@ export default function MaterialsTab({
   onUpdated: () => void;
   onNavigate: (target: NavTarget) => void;
 }) {
-  const [tab, setTab] = useState<"pdf" | "link" | "text">("pdf");
+  const [tab, setTab] = useState<"pdf" | "image" | "link" | "text">("pdf");
   const [dragOver, setDragOver] = useState(false);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkName, setLinkName] = useState("");
   const [textContent, setTextContent] = useState("");
   const [textName, setTextName] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [selected, setSelected] = useState<Set<string>>(new Set(["study-guide", "quiz", "cheat-sheet", "exam-prep"]));
   const [customPrompt, setCustomPrompt] = useState("");
@@ -63,33 +66,46 @@ export default function MaterialsTab({
   const [uploading, setUploading] = useState<Set<string>>(new Set());
   const [uploadErrors, setUploadErrors] = useState<Record<string, string>>({});
 
-  const handleAddPdfs = async (fileList: FileList | File[]) => {
-    const pdfs = Array.from(fileList).filter((f) => f.type === "application/pdf");
-    for (const file of pdfs) {
+  const isImage = (f: File) => f.type.startsWith("image/");
+  const isPdf = (f: File) => f.type === "application/pdf";
+
+  const uploadFile = async (mat: Material, file: File) => {
+    setUploading((p) => new Set(p).add(mat.id));
+    setUploadErrors((p) => { const n = { ...p }; delete n[mat.id]; return n; });
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload-pdf", { method: "POST", body: fd });
+      const data = await parseApiResponse<{ uri: string; mimeType: string; name: string }>(res);
+      updateMaterial(subject.id, mat.id, { uri: data.uri, mimeType: data.mimeType });
+      onUpdated();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Upload failed";
+      setUploadErrors((p) => ({ ...p, [mat.id]: msg }));
+    } finally {
+      setUploading((p) => { const n = new Set(p); n.delete(mat.id); return n; });
+    }
+  };
+
+  const handleAddFiles = async (fileList: FileList | File[]) => {
+    const files = Array.from(fileList).filter((f) => isPdf(f) || isImage(f));
+    for (const file of files) {
       const dup = subject.materials.find((m) => m.name === file.name && m.size === file.size);
       if (dup) continue;
 
-      const mat = addMaterial(subject.id, { name: file.name, type: "pdf", data: "", size: file.size });
+      const type = isImage(file) ? "image" : "pdf";
+      const mat = addMaterial(subject.id, { name: file.name, type, data: "", size: file.size, mimeType: file.type });
+      if (type === "image") {
+        imageBlobRef.current.set(mat.id, URL.createObjectURL(file));
+      }
       onUpdated();
 
-      setUploading((p) => new Set(p).add(mat.id));
-      setUploadErrors((p) => { const n = { ...p }; delete n[mat.id]; return n; });
-
-      try {
-        const fd = new FormData();
-        fd.append("file", file);
-        const res = await fetch("/api/upload-pdf", { method: "POST", body: fd });
-        const data = await parseApiResponse<{ uri: string; mimeType: string; name: string }>(res);
-        updateMaterial(subject.id, mat.id, { uri: data.uri, mimeType: data.mimeType });
-        onUpdated();
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Upload failed";
-        setUploadErrors((p) => ({ ...p, [mat.id]: msg }));
-      } finally {
-        setUploading((p) => { const n = new Set(p); n.delete(mat.id); return n; });
-      }
+      await uploadFile(mat, file);
     }
   };
+
+  const handleAddPdfs = handleAddFiles;
+  const handleAddImages = handleAddFiles;
 
   const handleAddLink = () => {
     const url = linkUrl.trim();
@@ -107,6 +123,17 @@ export default function MaterialsTab({
 
   const handleRemove = (id: string) => {
     pdfDataRef.current.delete(id);
+    const blobUrl = imageBlobRef.current.get(id);
+    if (blobUrl?.startsWith("blob:")) URL.revokeObjectURL(blobUrl);
+    imageBlobRef.current.delete(id);
+    // also revoke any page rasters for this material
+    for (const key of Array.from(imageBlobRef.current.keys())) {
+      if (key.startsWith(`${id}::`)) {
+        const url = imageBlobRef.current.get(key);
+        if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+        imageBlobRef.current.delete(key);
+      }
+    }
     removeMaterial(subject.id, id);
     onUpdated();
   };
@@ -117,7 +144,7 @@ export default function MaterialsTab({
     return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   };
 
-  const icons: Record<string, string> = { pdf: "📄", link: "🔗", text: "📝" };
+  const icons: Record<string, string> = { pdf: "📄", link: "🔗", text: "📝", image: "🖼" };
 
   const toggle = (key: string) => {
     setSelected((prev) => {
@@ -272,7 +299,7 @@ export default function MaterialsTab({
       {/* Upload area */}
       <div className="space-y-4">
         <div className="flex gap-1 bg-zinc-900 p-1 rounded-lg w-fit">
-          {(["pdf", "link", "text"] as const).map((t) => (
+          {(["pdf", "image", "link", "text"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -280,7 +307,7 @@ export default function MaterialsTab({
                 tab === t ? "bg-zinc-700 text-zinc-200" : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
-              {t === "pdf" ? "PDFs" : t === "link" ? "Links" : "Text Notes"}
+              {t === "pdf" ? "PDFs" : t === "image" ? "Images" : t === "link" ? "Links" : "Text Notes"}
             </button>
           ))}
         </div>
@@ -305,6 +332,33 @@ export default function MaterialsTab({
             />
             <p className="text-zinc-400 text-sm">Drop PDFs here or click to browse</p>
             <p className="text-zinc-600 text-xs mt-1">Upload lecture slides, textbooks, past exams</p>
+          </div>
+        )}
+
+        {tab === "image" && (
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleAddImages(e.dataTransfer.files); }}
+            onClick={() => imageInputRef.current?.click()}
+            onPaste={(e) => {
+              const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+              if (files.length) handleAddImages(files);
+            }}
+            className={`border-2 border-dashed rounded-xl p-6 cursor-pointer transition-all ${
+              dragOver ? "border-violet-400 bg-violet-500/5" : "border-zinc-700 hover:border-violet-500"
+            }`}
+          >
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => { if (e.target.files) handleAddImages(e.target.files); e.target.value = ""; }}
+            />
+            <p className="text-zinc-400 text-sm">Drop images, paste, or click to browse</p>
+            <p className="text-zinc-600 text-xs mt-1">Diagrams, screenshots, hand-written notes — anything the AI should “see”</p>
           </div>
         )}
 
@@ -342,20 +396,25 @@ export default function MaterialsTab({
             {subject.materials.length} material{subject.materials.length !== 1 ? "s" : ""} uploaded
           </h3>
           {subject.materials.map((m) => {
-            const isPdf = m.type === "pdf";
+            const isFile = m.type === "pdf" || m.type === "image";
             const isUploading = uploading.has(m.id);
             const uploadError = uploadErrors[m.id];
             const hasUri = !!m.uri;
             const hasMemoryBase64 = pdfDataRef.current.has(m.id) && !hasUri;
-            const ready = !isPdf || hasUri || hasMemoryBase64;
-            const needsReupload = isPdf && !ready && !isUploading && !uploadError;
+            const ready = !isFile || hasUri || hasMemoryBase64;
+            const needsReupload = isFile && !ready && !isUploading && !uploadError;
+            const thumb = m.type === "image" ? imageBlobRef.current.get(m.id) : undefined;
 
             return (
               <div key={m.id}
                 className={`flex items-center gap-2.5 bg-zinc-900 border rounded-lg px-3 py-2 text-sm group ${
                   uploadError ? "border-red-900/40" : ready ? "border-zinc-800" : "border-amber-900/30"
                 }`}>
-                <span className="text-xs">{icons[m.type]}</span>
+                {thumb ? (
+                  <img src={thumb} alt="" className="w-8 h-8 object-cover rounded shrink-0" />
+                ) : (
+                  <span className="text-xs w-8 text-center shrink-0">{icons[m.type]}</span>
+                )}
                 <span className={`truncate flex-1 ${ready ? "text-zinc-300" : "text-zinc-500"}`}>{m.name}</span>
                 {isUploading && (
                   <span className="text-[10px] text-violet-400 flex items-center gap-1 shrink-0">

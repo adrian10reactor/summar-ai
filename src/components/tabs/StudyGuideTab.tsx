@@ -5,6 +5,7 @@ import { Subject } from "@/types";
 import { saveStudyGuide } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
 import { parseApiResponse } from "@/lib/api";
+import { ImageLookup, swapMaterialImages } from "@/lib/render";
 
 function downloadAsHtml(contentHtml: string, displayName: string) {
   const html = `<!DOCTYPE html>
@@ -101,6 +102,7 @@ export default function StudyGuideTab({
   onCost,
   onUpdated,
   onAskAbout,
+  imageLookup,
 }: {
   subject: Subject;
   getMaterials: () => { type: string; data: string; name: string }[];
@@ -109,6 +111,7 @@ export default function StudyGuideTab({
   onCost: (amount: number, action: string) => void;
   onUpdated: () => void;
   onAskAbout: (payload: { message: string; chatName: string }) => void;
+  imageLookup: ImageLookup;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -306,7 +309,7 @@ export default function StudyGuideTab({
                 [&_hr]:border-zinc-800 [&_hr]:my-6
                 [&_details]:bg-zinc-950 [&_details]:rounded-lg [&_details]:p-4 [&_details]:my-3
                 [&_summary]:cursor-pointer [&_summary]:text-violet-400 [&_summary]:font-medium [&_summary]:text-sm"
-              dangerouslySetInnerHTML={{ __html: active?.html || "" }}
+              dangerouslySetInnerHTML={{ __html: swapMaterialImages(active?.html || "", subject, imageLookup) }}
             />
           </div>
 

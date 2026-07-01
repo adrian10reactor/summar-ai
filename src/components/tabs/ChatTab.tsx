@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { Subject, ChatMessage, ChatConversation } from "@/types";
+import { useState, useRef, useEffect, MutableRefObject } from "react";
+import { Subject, ChatMessage, ChatAttachment } from "@/types";
 import { createChat, deleteChat, saveChatMessages, renameChat } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
 import { parseApiResponse } from "@/lib/api";
+import { ImageLookup, swapMaterialImages } from "@/lib/render";
 
 export default function ChatTab({
   subject,
@@ -15,6 +16,8 @@ export default function ChatTab({
   onUpdated,
   launch,
   onLaunchConsumed,
+  imageLookup,
+  imageBlobRef,
 }: {
   subject: Subject;
   getMaterials: () => { type: string; data: string; name: string }[];
@@ -22,8 +25,10 @@ export default function ChatTab({
   hasMaterials: boolean;
   onCost: (amount: number, action: string) => void;
   onUpdated: () => void;
-  launch?: { message: string; chatName: string; nonce: number } | null;
+  launch?: { message: string; chatName: string; nonce: number; attachments?: ChatAttachment[] } | null;
   onLaunchConsumed?: () => void;
+  imageLookup: ImageLookup;
+  imageBlobRef: MutableRefObject<Map<string, string>>;
 }) {
   const chats = subject.content.chats;
   const [activeChatId, setActiveChatId] = useState<string | null>(chats[0]?.id || null);
@@ -36,7 +41,36 @@ export default function ChatTab({
   const [renameValue, setRenameValue] = useState("");
   const [renamingActiveTitle, setRenamingActiveTitle] = useState(false);
   const [activeTitleValue, setActiveTitleValue] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const [pending, setPending] = useState<(ChatAttachment & { localId: string; uploading?: boolean; failed?: boolean })[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const attachImage = async (file: File) => {
+    if (!file.type.startsWith("image/")) return;
+    const localId = crypto.randomUUID();
+    const blobUrl = URL.createObjectURL(file);
+    imageBlobRef.current.set(`chat-attach::${localId}`, blobUrl);
+    setPending((p) => [...p, { localId, name: file.name, mimeType: file.type, uploading: true }]);
+
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload-pdf", { method: "POST", body: fd });
+      const data = await parseApiResponse<{ uri: string; mimeType: string; name: string }>(res);
+      setPending((p) => p.map((a) => a.localId === localId ? { ...a, uri: data.uri, mimeType: data.mimeType, uploading: false } : a));
+    } catch {
+      setPending((p) => p.map((a) => a.localId === localId ? { ...a, uploading: false, failed: true } : a));
+    }
+  };
+
+  const removePending = (localId: string) => {
+    const key = `chat-attach::${localId}`;
+    const url = imageBlobRef.current.get(key);
+    if (url?.startsWith("blob:")) URL.revokeObjectURL(url);
+    imageBlobRef.current.delete(key);
+    setPending((p) => p.filter((a) => a.localId !== localId));
+  };
 
   const activeChat = chats.find((c) => c.id === activeChatId);
 
@@ -84,12 +118,19 @@ export default function ChatTab({
 
   const handleSend = async () => {
     const text = input.trim();
-    if (!text || loading || !activeChatId) return;
+    const attachmentsReady = pending.filter((a) => !!a.uri && !a.failed);
+    if ((!text && attachmentsReady.length === 0) || loading || !activeChatId) return;
+    if (pending.some((a) => a.uploading)) return;
 
-    const userMsg: ChatMessage = { role: "user", content: text, timestamp: Date.now() };
+    const attachmentsForMessage: ChatAttachment[] = attachmentsReady.map((a) => ({
+      name: a.name, mimeType: a.mimeType, uri: a.uri, data: `chat-attach::${a.localId}`,
+    }));
+
+    const userMsg: ChatMessage = { role: "user", content: text, timestamp: Date.now(), attachments: attachmentsForMessage };
     const updated = [...messages, userMsg];
     setMessages(updated);
     setInput("");
+    setPending([]);
     setLoading(true);
     setStatus("Thinking...");
 
@@ -101,9 +142,10 @@ export default function ChatTab({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: text,
+          message: text || "(image sent)",
           history: updated.slice(-20).map((m) => ({ role: m.role, content: m.content })),
           materials,
+          attachments: attachmentsReady.map((a) => ({ name: a.name, mimeType: a.mimeType, uri: a.uri })),
         }),
       });
       const data = await parseApiResponse<{ reply: string; _usage?: { tokensIn: number; tokensOut: number } }>(res);
@@ -332,8 +374,22 @@ export default function ChatTab({
                   : "bg-zinc-900 border border-zinc-800 text-zinc-300"
               }`}
             >
+              {msg.attachments && msg.attachments.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {msg.attachments.map((a, ai) => {
+                    const url = a.data ? imageBlobRef.current.get(a.data) : undefined;
+                    return url ? (
+                      <img key={ai} src={url} alt={a.name} className="max-w-full max-h-64 rounded-lg" />
+                    ) : (
+                      <div key={ai} className="text-[10px] text-zinc-500 border border-zinc-700 rounded px-2 py-1">
+                        🖼 {a.name}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
               {msg.role === "user" ? (
-                <p className="whitespace-pre-wrap">{msg.content}</p>
+                msg.content && <p className="whitespace-pre-wrap">{msg.content}</p>
               ) : (
                 <div
                   className="[&_p]:mb-2 [&_p]:last:mb-0 [&_h3]:font-semibold [&_h3]:text-zinc-200 [&_h3]:mb-2
@@ -343,7 +399,7 @@ export default function ChatTab({
                     [&_code]:bg-zinc-800 [&_code]:px-1 [&_code]:rounded [&_code]:text-violet-300 [&_code]:text-xs
                     [&_pre]:bg-zinc-950 [&_pre]:rounded-lg [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:my-2 [&_pre_code]:bg-transparent [&_pre_code]:p-0
                     [&_blockquote]:border-l-2 [&_blockquote]:border-violet-500 [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-zinc-400"
-                  dangerouslySetInnerHTML={{ __html: msg.content }}
+                  dangerouslySetInnerHTML={{ __html: swapMaterialImages(msg.content, subject, imageLookup) }}
                 />
               )}
             </div>
@@ -370,22 +426,100 @@ export default function ChatTab({
 
       {/* Input */}
       {activeChatId && (
-        <div className="flex gap-2 shrink-0">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-            placeholder="Ask about your materials..."
-            disabled={loading}
-            className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500 disabled:opacity-50 transition-colors"
-          />
-          <button
-            onClick={handleSend}
-            disabled={loading || !input.trim()}
-            className="px-5 py-3 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-500 disabled:opacity-40 transition-colors"
-          >
-            Send
-          </button>
+        <div
+          className="shrink-0 relative"
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+            files.forEach(attachImage);
+          }}
+        >
+          {dragOver && (
+            <div className="absolute inset-0 -m-2 bg-violet-500/10 border-2 border-dashed border-violet-400 rounded-2xl z-10 pointer-events-none flex items-center justify-center">
+              <p className="text-sm text-violet-300">Drop image to attach</p>
+            </div>
+          )}
+
+          {/* Pending attachment strip */}
+          {pending.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2 p-2 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+              {pending.map((a) => {
+                const url = imageBlobRef.current.get(`chat-attach::${a.localId}`);
+                return (
+                  <div key={a.localId} className="relative group">
+                    {url ? (
+                      <img src={url} alt={a.name} className="w-16 h-16 object-cover rounded-lg" />
+                    ) : (
+                      <div className="w-16 h-16 bg-zinc-800 rounded-lg flex items-center justify-center text-xs text-zinc-500">🖼</div>
+                    )}
+                    {a.uploading && (
+                      <div className="absolute inset-0 rounded-lg bg-black/40 flex items-center justify-center">
+                        <div className="w-4 h-4 border-2 border-violet-300 border-t-transparent rounded-full animate-spin-slow" />
+                      </div>
+                    )}
+                    {a.failed && (
+                      <div className="absolute inset-0 rounded-lg bg-red-900/60 flex items-center justify-center text-[10px] text-red-200">
+                        failed
+                      </div>
+                    )}
+                    <button
+                      onClick={() => removePending(a.localId)}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-600 text-zinc-300 text-[10px] hover:bg-red-600 hover:border-red-500 hover:text-white transition-colors flex items-center justify-center"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                if (e.target.files) Array.from(e.target.files).forEach(attachImage);
+                e.target.value = "";
+              }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading}
+              title="Attach image"
+              className="px-3 py-3 rounded-xl border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 disabled:opacity-40 transition-colors"
+            >
+              📎
+            </button>
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+              onPaste={(e) => {
+                const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
+                if (files.length) {
+                  e.preventDefault();
+                  files.forEach(attachImage);
+                }
+              }}
+              placeholder="Ask about your materials, paste or drop an image..."
+              disabled={loading}
+              className="flex-1 bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-violet-500 disabled:opacity-50 transition-colors"
+            />
+            <button
+              onClick={handleSend}
+              disabled={loading || (!input.trim() && pending.filter((a) => a.uri).length === 0) || pending.some((a) => a.uploading)}
+              className="px-5 py-3 rounded-xl bg-violet-600 text-white font-medium hover:bg-violet-500 disabled:opacity-40 transition-colors"
+            >
+              Send
+            </button>
+          </div>
         </div>
       )}
     </div>

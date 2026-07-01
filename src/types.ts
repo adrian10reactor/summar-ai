@@ -22,18 +22,28 @@ export interface SavedQuiz {
 export interface Material {
   id: string;
   name: string;
-  type: "pdf" | "link" | "text";
+  type: "pdf" | "link" | "text" | "image";
   data: string;
   size: number;
   addedAt: number;
   uri?: string;
   mimeType?: string;
+  pageCount?: number;
+  pageUris?: { pageNum: number; uri: string; mimeType: string }[];
+}
+
+export interface ChatAttachment {
+  name: string;
+  mimeType: string;
+  uri?: string;
+  data?: string;
 }
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: number;
+  attachments?: ChatAttachment[];
 }
 
 export interface ChatConversation {

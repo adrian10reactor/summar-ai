@@ -5,6 +5,7 @@ import { Subject, CustomSection } from "@/types";
 import { saveCustomSectionHtml, deleteCustomSection, updateCustomSection } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
 import { parseApiResponse } from "@/lib/api";
+import { ImageLookup, swapMaterialImages } from "@/lib/render";
 
 export default function CustomSectionTab({
   subject,
@@ -15,6 +16,7 @@ export default function CustomSectionTab({
   onCost,
   onUpdated,
   onDeleted,
+  imageLookup,
 }: {
   subject: Subject;
   section: CustomSection;
@@ -24,6 +26,7 @@ export default function CustomSectionTab({
   onCost: (amount: number, action: string) => void;
   onUpdated: () => void;
   onDeleted: () => void;
+  imageLookup: ImageLookup;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -176,7 +179,7 @@ export default function CustomSectionTab({
           [&_table]:w-full [&_th]:bg-zinc-800 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-zinc-200 [&_th]:text-sm
           [&_td]:px-3 [&_td]:py-2 [&_td]:border-t [&_td]:border-zinc-800 [&_td]:text-zinc-300 [&_td]:text-sm
           [&_hr]:border-zinc-800 [&_hr]:my-6"
-        dangerouslySetInnerHTML={{ __html: section.html }}
+        dangerouslySetInnerHTML={{ __html: swapMaterialImages(section.html, subject, imageLookup) }}
       />
     </div>
   );

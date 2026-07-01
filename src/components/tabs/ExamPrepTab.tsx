@@ -3,6 +3,7 @@
 import { Subject } from "@/types";
 import { saveExamPrep } from "@/lib/storage";
 import HtmlContentTab from "./HtmlContentTab";
+import { ImageLookup } from "@/lib/render";
 
 export default function ExamPrepTab(props: {
   subject: Subject;
@@ -11,6 +12,7 @@ export default function ExamPrepTab(props: {
   hasMaterials: boolean;
   onCost: (amount: number, action: string) => void;
   onUpdated: () => void;
+  imageLookup: ImageLookup;
 }) {
   return (
     <HtmlContentTab

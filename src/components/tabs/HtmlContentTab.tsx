@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Subject } from "@/types";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
 import { parseApiResponse } from "@/lib/api";
+import { ImageLookup, swapMaterialImages } from "@/lib/render";
 
 function downloadAsHtml(contentHtml: string, displayName: string) {
   const html = `<!DOCTYPE html>
@@ -72,6 +73,7 @@ export default function HtmlContentTab({
   onSave,
   onCost,
   onUpdated,
+  imageLookup,
 }: {
   subject: Subject;
   contentKey: "studyGuide" | "cheatSheet" | "examPrep";
@@ -85,6 +87,7 @@ export default function HtmlContentTab({
   onSave: (subjectId: string, html: string) => void;
   onCost: (amount: number, action: string) => void;
   onUpdated: () => void;
+  imageLookup: ImageLookup;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -182,7 +185,7 @@ export default function HtmlContentTab({
           [&_hr]:border-zinc-800 [&_hr]:my-6
           [&_details]:bg-zinc-950 [&_details]:rounded-lg [&_details]:p-4 [&_details]:my-3
           [&_summary]:cursor-pointer [&_summary]:text-violet-400 [&_summary]:font-medium [&_summary]:text-sm"
-        dangerouslySetInnerHTML={{ __html: existing.html }}
+        dangerouslySetInnerHTML={{ __html: swapMaterialImages(existing.html, subject, imageLookup) }}
       />
     </div>
   );

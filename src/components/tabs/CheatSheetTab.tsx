@@ -3,6 +3,7 @@
 import { Subject } from "@/types";
 import { saveCheatSheet } from "@/lib/storage";
 import HtmlContentTab from "./HtmlContentTab";
+import { ImageLookup } from "@/lib/render";
 
 export default function CheatSheetTab(props: {
   subject: Subject;
@@ -11,6 +12,7 @@ export default function CheatSheetTab(props: {
   hasMaterials: boolean;
   onCost: (amount: number, action: string) => void;
   onUpdated: () => void;
+  imageLookup: ImageLookup;
 }) {
   return (
     <HtmlContentTab
