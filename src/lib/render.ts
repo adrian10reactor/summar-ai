@@ -1,18 +1,48 @@
 import { Subject } from "@/types";
 
-// Pull the top-level topics (h2 headings) out of a subject's generated
-// study guide so we can advertise them to the model for cross-subject links.
+// Pull topic labels out of a subject's generated study guide so the model can
+// reference them in cross-subject links. Returns h2s at the top level plus each
+// subject's h3 subsection titles nested underneath their parent.
 export function extractSubjectTopics(subject: Subject): string[] {
   const html = subject.content.studyGuide?.html;
   if (!html) return [];
+
+  const out: string[] = [];
+
   if (typeof window === "undefined") {
-    // Server-side fallback: regex h2s.
-    const matches = html.match(/<h2[^>]*>([^<]+)<\/h2>/gi) || [];
-    return matches.map((m) => m.replace(/<[^>]+>/g, "").trim()).filter(Boolean);
+    // Server-side fallback: regex.
+    const matches = html.match(/<(h2|h3)[^>]*>([^<]+)<\/(h2|h3)>/gi) || [];
+    let currentH2 = "";
+    for (const m of matches) {
+      const text = m.replace(/<[^>]+>/g, "").trim();
+      if (!text) continue;
+      if (/^<h2/i.test(m)) {
+        currentH2 = text;
+        out.push(text);
+      } else {
+        out.push(currentH2 ? `${currentH2} → ${text}` : text);
+      }
+    }
+    return out;
   }
+
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<div>${html}</div>`, "text/html");
-  return Array.from(doc.querySelectorAll("h2")).map((h) => (h.textContent || "").trim()).filter(Boolean);
+  const root = doc.body.firstElementChild;
+  if (!root) return [];
+
+  let currentH2 = "";
+  for (const el of Array.from(root.children)) {
+    const text = (el.textContent || "").trim();
+    if (!text) continue;
+    if (el.tagName === "H2") {
+      currentH2 = text;
+      out.push(text);
+    } else if (el.tagName === "H3") {
+      out.push(currentH2 ? `${currentH2} → ${text}` : text);
+    }
+  }
+  return out;
 }
 
 const PLACEHOLDER_HTML = `<div style="border:1px dashed #52525b;padding:14px;border-radius:6px;color:#a1a1aa;font-size:12px;margin:8px 0">

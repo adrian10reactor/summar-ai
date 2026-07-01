@@ -9,6 +9,8 @@ import {
 import { parseApiResponse } from "@/lib/api";
 import { rasterizePdf } from "@/lib/pdfPages";
 import { GenerationState, BatchItem } from "@/lib/useGeneration";
+import { getSubjects } from "@/lib/storage";
+import { extractSubjectTopics } from "@/lib/render";
 
 const GEN_SECTIONS = [
   { key: "study-guide", label: "Study Guide", icon: "📖", desc: "Comprehensive notes organized by topic" },
@@ -413,13 +415,41 @@ export default function MaterialsTab({
       )}
 
       {/* Generate sections */}
-      {hasMaterials && (
+      {hasMaterials && (() => {
+        const others = getSubjects()
+          .filter((s) => s.id !== subject.id)
+          .map((s) => ({ ...s, topics: extractSubjectTopics(s) }));
+        const linkable = others.filter((s) => s.topics.length > 0);
+        const notReady = others.filter((s) => s.topics.length === 0);
+        return (
         <div className="border-t border-zinc-800 pt-6 space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-zinc-200 mb-1">Generate Sections</h3>
             <p className="text-xs text-zinc-500">
               Select which sections to generate from your {subject.materials.length} material{subject.materials.length !== 1 ? "s" : ""}.
             </p>
+            {(linkable.length > 0 || notReady.length > 0) && (
+              <div className="mt-2 text-[11px] text-zinc-500 leading-relaxed">
+                <span className="text-zinc-400">Cross-subject links:</span>{" "}
+                {linkable.length > 0 && (
+                  <>
+                    will link into{" "}
+                    {linkable.map((s, i) => (
+                      <span key={s.id}>
+                        <span className="text-violet-300">{s.name}</span>
+                        {i < linkable.length - 1 ? ", " : ""}
+                      </span>
+                    ))}
+                    {notReady.length > 0 ? "; " : "."}
+                  </>
+                )}
+                {notReady.length > 0 && (
+                  <span className="text-zinc-600">
+                    {notReady.map((s) => s.name).join(", ")} won&apos;t be linked (no study guide yet — generate theirs first).
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Batch progress strip */}
@@ -674,7 +704,8 @@ export default function MaterialsTab({
             </span>
           </button>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

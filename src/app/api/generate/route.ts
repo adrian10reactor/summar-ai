@@ -327,17 +327,28 @@ export async function POST(req: NextRequest) {
     // let it insert links when a concept in this material is covered in another.
     if (mode !== "quiz" && otherSubjects.length > 0) {
       const lines: string[] = [];
-      lines.push("\n\nCROSS-SUBJECT LINKS:");
-      lines.push("The student has these OTHER subjects (not being generated now) with the following top-level topics:");
+      lines.push("\n\nCROSS-SUBJECT LINKS — VERY HIGH VALUE FOR THE STUDENT:");
+      lines.push("The student is also studying these OTHER subjects. Their existing topics (top-level → subsection) are listed below.");
+      lines.push("Actively hunt for opportunities to connect this material to those topics. Every time you mention a concept, tool, or formula that is CLEARLY owned by another subject on this list, add an inline link. Don't wait for a perfect match — even a partial connection is useful.");
+      lines.push("");
       for (const s of otherSubjects) {
         const topicList = s.topics.length > 0 ? s.topics.join(", ") : "(no study guide yet)";
         lines.push(`- id="${s.id}" name="${s.name}" topics: ${topicList}`);
       }
       lines.push("");
-      lines.push("Whenever THIS material relies on a concept clearly owned by another subject, add a small link inline:");
+      lines.push("Link syntax (place inline in the surrounding sentence, not on its own line):");
       lines.push('  <a data-subject-ref="OTHER_SUBJECT_ID" data-section="TOPIC_NAME">Covered in <em>Other Subject Name</em> → <em>Topic Name</em></a>');
-      lines.push('For example, if a Parallel Programming study guide mentions "we take the derivative to find the peak speedup", add: <a data-subject-ref="MATH_ID" data-section="Derivatives">Derivatives are covered in <em>Math</em></a>');
-      lines.push("Only link when the referenced topic exists in the topics list above. Do NOT invent topics. Use these sparingly (1-2 per subsection at most), only where the connection genuinely helps the student.");
+      lines.push("");
+      lines.push("Concrete examples:");
+      lines.push('- Physics guide mentions "the velocity is the derivative of position" → add <a data-subject-ref="MATH_ID" data-section="Derivatives">Derivatives are covered in <em>Math</em></a>');
+      lines.push('- Physics guide mentions "kinetic energy = 1/2 m v²" and Math has an "Integrals" topic → link to it when discussing work-energy theorem');
+      lines.push('- Parallel Programming guide uses limits or asymptotic notation → link to Math\'s Limits / Asymptotic behavior');
+      lines.push('- Any subject uses statistics/probability → link to the Statistics subject');
+      lines.push("");
+      lines.push("RULES:");
+      lines.push("- The data-section string MUST come exactly from the topics list above (either the h2 or the 'h2 → h3' form). Never invent topic names.");
+      lines.push("- Use links inline in prose, not as standalone sentences.");
+      lines.push("- Aim for at least 1-2 cross-subject links per major section (<h2>) when the material genuinely touches another subject. If the material is completely unrelated, don't force it.");
       prompt += lines.join("\n");
     }
 

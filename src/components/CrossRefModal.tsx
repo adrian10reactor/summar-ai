@@ -20,21 +20,28 @@ function findSectionSnippet(subject: Subject, section?: string): { title: string
   const root = doc.body.firstElementChild;
   if (!root) return null;
 
-  const target = section?.trim().toLowerCase();
-  let matchIndex = -1;
-  const h2s = Array.from(root.querySelectorAll("h2"));
-  if (target) {
-    matchIndex = h2s.findIndex((h) => (h.textContent || "").toLowerCase().includes(target));
+  const raw = section?.trim() || "";
+  // Section refs may come as "h2 → h3" from the topic list. Split so we can try
+  // to land on the specific h3 first, then fall back to the h2 if not found.
+  const parts = raw.split(/\s*(?:→|->|>)\s*/).map((p) => p.toLowerCase()).filter(Boolean);
+  const wanted = parts[parts.length - 1] || "";
+
+  const headings = Array.from(root.querySelectorAll("h2, h3"));
+  let match: Element | null = null;
+  if (wanted) {
+    match = headings.find((h) => (h.textContent || "").toLowerCase().includes(wanted)) || null;
   }
-  if (matchIndex === -1) matchIndex = 0;
-  const match = h2s[matchIndex];
+  if (!match) match = headings[0] || null;
   if (!match) return null;
 
-  // Walk siblings after this h2 up to the next h2, collect first ~600 chars.
+  // Walk siblings after this heading up to the next heading of same-or-higher rank.
+  const rank = match.tagName === "H2" ? 2 : 3;
   const buf: string[] = [];
   let acc = 0;
   let node: Element | null = match.nextElementSibling;
-  while (node && node.tagName !== "H2" && acc < 800) {
+  while (node && acc < 800) {
+    const t = node.tagName;
+    if (t === "H2" || (rank === 3 && t === "H3")) break;
     buf.push(node.outerHTML);
     acc += node.textContent?.length || 0;
     node = node.nextElementSibling;
