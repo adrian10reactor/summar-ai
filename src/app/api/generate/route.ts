@@ -216,6 +216,8 @@ async function callGemini(apiKey: string, prompt: string, parts: Part[]) {
 }
 
 function cleanError(message: string): string {
+  // Let our own informative fallback messages pass through untouched.
+  if (message.startsWith("Gemini daily quota exhausted.")) return message;
   if (/429|quota|RESOURCE_EXHAUSTED|503|UNAVAILABLE|overloaded|high demand|500|INTERNAL|502|504|DEADLINE_EXCEEDED/.test(message)) {
     return "High usage — try again in a minute.";
   }
@@ -361,7 +363,10 @@ export async function POST(req: NextRequest) {
     try {
       result = await callGemini(apiKey, prompt, parts);
     } catch (geminiErr) {
-      if (!isOpenRouterConfigured()) throw geminiErr;
+      if (!isOpenRouterConfigured()) {
+        console.log("Gemini chain exhausted; OPENROUTER_API_KEY not set — no fallback available.");
+        throw new Error("Gemini daily quota exhausted. Add OPENROUTER_API_KEY in Vercel env vars to enable free fallback, or wait until the quota resets (~1am Zagreb time).");
+      }
       console.log("Gemini chain exhausted for generate, falling back to OpenRouter");
       // Assemble text-only view of the materials for the fallback.
       const textParts: string[] = [];

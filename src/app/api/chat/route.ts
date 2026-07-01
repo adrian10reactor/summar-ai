@@ -201,11 +201,18 @@ When solving a physics/math problem, draw the setup — a skica with the problem
         });
       } catch (e: unknown) {
         console.error("OpenRouter fallback failed:", e instanceof Error ? e.message : e);
-        // Fall through to the generic error below.
+        return NextResponse.json(
+          { error: "Gemini quota exhausted and OpenRouter fallback also failed. Try again in a minute, or check OpenRouter account balance." },
+          { status: 503 }
+        );
       }
     }
 
-    return NextResponse.json({ error: "High usage — try again in a minute." }, { status: 503 });
+    console.log("Gemini chain exhausted; OPENROUTER_API_KEY not set — no fallback available.");
+    return NextResponse.json(
+      { error: "Gemini daily quota exhausted. Add OPENROUTER_API_KEY in Vercel env vars to enable free fallback, or wait until the quota resets (~1am Zagreb time)." },
+      { status: 503 }
+    );
   } catch (e: unknown) {
     const raw = e instanceof Error ? e.message : "Unknown error";
     console.error("Chat error:", raw);
