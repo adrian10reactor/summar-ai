@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI, Part } from "@google/generative-ai";
+import { callOpenRouter, isOpenRouterConfigured, OpenRouterMessage } from "@/lib/openrouter";
 
 const MODELS = [
   "gemini-2.5-flash",
@@ -9,9 +10,6 @@ const MODELS = [
   "gemini-2.5-pro",
   "gemini-2.0-flash-001",
   "gemini-2.0-flash-lite-001",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-8b",
-  "gemini-1.5-pro",
 ];
 
 type Mode = "quiz" | "study-guide" | "cheat-sheet" | "exam-prep" | "custom";
@@ -204,7 +202,8 @@ async function callGemini(apiKey: string, prompt: string, parts: Part[]) {
         m.includes("429") || m.includes("quota") || m.includes("RESOURCE_EXHAUSTED") ||
         m.includes("503") || m.includes("UNAVAILABLE") || m.includes("overloaded") || m.includes("high demand") ||
         m.includes("500") || m.includes("INTERNAL") ||
-        m.includes("502") || m.includes("504") || m.includes("DEADLINE_EXCEEDED");
+        m.includes("502") || m.includes("504") || m.includes("DEADLINE_EXCEEDED") ||
+        m.includes("404") || m.includes("NOT_FOUND") || m.includes("not found");
       if (isRetryable) {
         console.log(`${modelName} unavailable (${m.slice(0, 80)}), trying next...`);
         continue;
@@ -356,7 +355,32 @@ export async function POST(req: NextRequest) {
     if (customPrompt) {
       prompt += `\n\nADDITIONAL USER INSTRUCTIONS: ${customPrompt}`;
     }
-    const result = await callGemini(apiKey, prompt, parts);
+
+    let result: { text: string; tokensIn: number; tokensOut: number };
+    try {
+      result = await callGemini(apiKey, prompt, parts);
+    } catch (geminiErr) {
+      if (!isOpenRouterConfigured()) throw geminiErr;
+      console.log("Gemini chain exhausted for generate, falling back to OpenRouter");
+      // Assemble text-only view of the materials for the fallback.
+      const textParts: string[] = [];
+      const skipped: string[] = [];
+      for (const mat of materials) {
+        if (mat.type === "text") textParts.push(`### ${mat.name}\n${mat.data}`);
+        else if (mat.type === "link") textParts.push(`- ${mat.name}: ${mat.data}`);
+        else if (mat.type === "pdf" || mat.type === "image") skipped.push(mat.name);
+      }
+      const fallbackNote = skipped.length > 0
+        ? `\n\n[Fallback mode — Gemini unavailable, running via OpenRouter. The following ${skipped.length} file material(s) can't be inspected in this fallback: ${skipped.slice(0, 5).join(", ")}${skipped.length > 5 ? "…" : ""}. Do your best from remaining sources and general knowledge.]`
+        : "";
+      const materialsSection = textParts.length > 0 ? `\n\nMATERIALS:\n\n${textParts.join("\n\n")}` : "";
+
+      const or = await callOpenRouter([
+        { role: "system", content: prompt + fallbackNote },
+        { role: "user", content: `Generate now.${materialsSection}` },
+      ], { maxTokens: 16384 });
+      result = { text: or.text, tokensIn: or.tokensIn, tokensOut: or.tokensOut };
+    }
 
     if (mode === "quiz") {
       const jsonStr = result.text

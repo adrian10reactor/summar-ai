@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI, Part, Content } from "@google/generative-ai";
+import { callOpenRouter, isOpenRouterConfigured, OpenRouterMessage } from "@/lib/openrouter";
 
 const MODELS = [
   "gemini-2.5-flash",
@@ -7,9 +8,6 @@ const MODELS = [
   "gemini-2.5-flash-lite",
   "gemini-2.0-flash-lite",
   "gemini-2.5-pro",
-  "gemini-1.5-flash",
-  "gemini-1.5-flash-8b",
-  "gemini-1.5-pro",
 ];
 
 export async function POST(req: NextRequest) {
@@ -143,12 +141,66 @@ When solving a physics/math problem, draw the setup — a skica with the problem
           m.includes("429") || m.includes("quota") || m.includes("RESOURCE_EXHAUSTED") ||
           m.includes("503") || m.includes("UNAVAILABLE") || m.includes("overloaded") || m.includes("high demand") ||
           m.includes("500") || m.includes("INTERNAL") ||
-          m.includes("502") || m.includes("504") || m.includes("DEADLINE_EXCEEDED");
+          m.includes("502") || m.includes("504") || m.includes("DEADLINE_EXCEEDED") ||
+          m.includes("404") || m.includes("NOT_FOUND") || m.includes("not found");
         if (isRetryable) {
           console.log(`${modelName} unavailable (${m.slice(0, 80)}), trying next...`);
           continue;
         }
         throw e;
+      }
+    }
+
+    // Gemini chain exhausted — try OpenRouter as fallback if configured.
+    if (isOpenRouterConfigured()) {
+      console.log("Gemini chain exhausted, falling back to OpenRouter");
+      try {
+        // Build text-only prompt for OpenRouter. PDF/image URIs are Gemini-scoped
+        // so we can't forward them; note this in the system prompt.
+        const materialsText: string[] = [];
+        const textMaterials: string[] = [];
+        const skippedFiles: string[] = [];
+        for (const mat of materials) {
+          if (mat.type === "text") {
+            textMaterials.push(`### ${mat.name}\n${mat.data}`);
+          } else if (mat.type === "link") {
+            materialsText.push(`- Reference link: ${mat.name} — ${mat.data}`);
+          } else if (mat.type === "pdf" || mat.type === "image") {
+            skippedFiles.push(mat.name);
+          }
+        }
+
+        const fallbackSystem = systemPrompt +
+          (skippedFiles.length > 0
+            ? `\n\n[Fallback mode] Gemini was unavailable; running via OpenRouter. The following ${skippedFiles.length} file material(s) can't be inspected in this fallback: ${skippedFiles.slice(0, 5).join(", ")}${skippedFiles.length > 5 ? "…" : ""}. Answer based on the chat history, text notes, and general knowledge.`
+            : "");
+
+        const orMessages: OpenRouterMessage[] = [
+          { role: "system", content: fallbackSystem },
+        ];
+        if (textMaterials.length > 0 || materialsText.length > 0) {
+          orMessages.push({
+            role: "system",
+            content: [
+              ...(textMaterials.length > 0 ? [`Study notes:\n\n${textMaterials.join("\n\n")}`] : []),
+              ...(materialsText.length > 0 ? [`Other references:\n${materialsText.join("\n")}`] : []),
+            ].join("\n\n"),
+          });
+        }
+        for (const h of history) {
+          orMessages.push({ role: h.role, content: h.content });
+        }
+        orMessages.push({ role: "user", content: message });
+
+        const or = await callOpenRouter(orMessages);
+        return NextResponse.json({
+          reply: or.text,
+          _usage: { tokensIn: or.tokensIn, tokensOut: or.tokensOut },
+          _fallback: { provider: "openrouter", model: or.modelUsed },
+        });
+      } catch (e: unknown) {
+        console.error("OpenRouter fallback failed:", e instanceof Error ? e.message : e);
+        // Fall through to the generic error below.
       }
     }
 
