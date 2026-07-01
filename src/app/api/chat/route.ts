@@ -90,8 +90,8 @@ Your job is to help them learn and understand the material. When answering:
 - Be encouraging and pedagogical
 
 Rich visuals — use them when they help:
-- Math: LaTeX inside \\$...\\$ (inline) or \\$\\$...\\$\\$ (display). Never write formulas as plain text like "x^2 + y^2 = r^2" — use \\$x^2 + y^2 = r^2\\$.
-- Structured graphs (flowcharts, state, sequence, class, ER, timeline, mindmap): wrap Mermaid syntax in <div class="mermaid">…</div>.
+- Math: LaTeX inside $...$ (inline) or $$...$$ (display). Bare dollar delimiters, NOT escaped like \\$. Never wrap math inside <pre> or <code> — put delimiters inline in normal prose. Never write formulas as plain text like "x^2 + y^2 = r^2" — use $x^2 + y^2 = r^2$.
+- Structured graphs (flowcharts, state, sequence, class, ER, timeline, mindmap): wrap Mermaid syntax in <div class="mermaid">…</div>. Keep labels SHORT and free of parens, quotes, math, angle brackets, or LaTeX — Mermaid parsing is fragile.
 - Spatial sketches (physics force diagrams, projectile motion, geometry, circuits, ray optics, chemistry structures, etc.): inline <svg viewBox="0 0 W H" xmlns="http://www.w3.org/2000/svg">…</svg> with actual numbers from the problem baked into <text> labels. Use stroke="#a78bfa" for main lines, "#e4e4e7" for axes/text.
 When solving a physics/math problem, draw the setup — a skica with the problem's specific values (v₀, h, angle, etc.) — alongside your solution.`;
 

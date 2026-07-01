@@ -7,6 +7,39 @@ import "katex/dist/katex.min.css";
 
 let mermaidInitialized = false;
 
+// Undo two common model mistakes before KaTeX runs:
+// (1) escaped dollar delimiters like \$x^2\$  →  $x^2$
+// (2) math wrapped in <pre> or <code> code blocks  →  unwrapped inline
+export function preprocessMath(html: string): string {
+  if (!html) return html;
+  let out = html;
+
+  // (1) Strip the backslash from escaped dollars.
+  out = out.replace(/\\\$/g, "$");
+
+  // (2) Unwrap <pre>...$$...$$...</pre> and <code>...$$...$$...</code> whose
+  // sole content is a math expression.
+  out = out.replace(
+    /<pre\b[^>]*>\s*(\$\$[\s\S]+?\$\$)\s*<\/pre>/gi,
+    '<p class="math-display-block">$1</p>'
+  );
+  out = out.replace(
+    /<code\b[^>]*>\s*(\$\$[\s\S]+?\$\$)\s*<\/code>/gi,
+    '$1'
+  );
+  // Also unwrap <code>$...$</code> when the code content is a bare inline math expression.
+  out = out.replace(
+    /<code\b[^>]*>\s*(\$[^\s$][^$]{0,300}?\$)\s*<\/code>/g,
+    '$1'
+  );
+
+  return out;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
+
 type KatexAutoRender = (
   element: HTMLElement,
   options: {
@@ -63,11 +96,29 @@ async function renderMermaid(root: HTMLElement) {
       });
       mermaidInitialized = true;
     }
-    await mermaid.run({ nodes: Array.from(nodes), suppressErrors: true });
-    // Belt-and-braces: some mermaid versions use different flag names.
-    nodes.forEach((n) => n.setAttribute("data-mermaid-rendered", "true"));
+
+    for (const node of Array.from(nodes)) {
+      const source = (node.textContent || "").trim();
+      node.setAttribute("data-mermaid-rendered", "true");
+      if (!source) continue;
+      try {
+        // Pre-validate — throws on syntax errors so we can catch instead of the bomb icon.
+        await mermaid.parse(source);
+        await mermaid.run({ nodes: [node], suppressErrors: true });
+      } catch {
+        // Malformed diagram — replace the bomb-icon UI with a graceful fallback
+        // that still shows the source so the student isn't left with nothing.
+        node.classList.remove("mermaid");
+        node.innerHTML = `
+          <div style="border:1px dashed #52525b;padding:12px;border-radius:8px;background:#18181b">
+            <p style="color:#a1a1aa;font-size:12px;margin:0 0 6px">Diagram couldn't be rendered — regenerate to try a different version. Source:</p>
+            <pre style="color:#71717a;font-size:11px;overflow-x:auto;margin:0;white-space:pre-wrap">${escapeHtml(source)}</pre>
+          </div>
+        `;
+      }
+    }
   } catch (e) {
-    console.warn("Mermaid render failed", e);
+    console.warn("Mermaid load failed", e);
   }
 }
 
@@ -93,6 +144,7 @@ export default function RenderedHtml({
   const ref = useRef<HTMLDivElement>(null);
   const processed = useMemo(() => {
     let out = swapMaterialImages(html, subject, imageLookup);
+    out = preprocessMath(out);
     // Style cross-subject reference links as pill buttons inline.
     out = out.replace(
       /<a\b([^>]*)\bdata-subject-ref="([^"]+)"([^>]*)>([\s\S]*?)<\/a>/gi,

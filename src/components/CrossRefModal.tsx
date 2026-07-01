@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Subject } from "@/types";
 import { swapMaterialImages, ImageLookup } from "@/lib/render";
+import { preprocessMath } from "./RenderedHtml";
 
 export interface CrossRefTarget {
   subjectId: string;
@@ -106,7 +107,7 @@ export default function CrossRefModal({
                     [&_li]:text-zinc-300 [&_li]:text-sm
                     [&_strong]:text-zinc-100
                     [&_code]:bg-zinc-800 [&_code]:px-1 [&_code]:rounded [&_code]:text-violet-300 [&_code]:text-xs"
-                  dangerouslySetInnerHTML={{ __html: swapMaterialImages(snippet.html, subject, imageLookup) }}
+                  dangerouslySetInnerHTML={{ __html: preprocessMath(swapMaterialImages(snippet.html, subject, imageLookup)) }}
                 />
               )}
             </div>

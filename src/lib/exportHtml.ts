@@ -2,7 +2,18 @@
 // and Mermaid for diagrams. Uses CDN for KaTeX/Mermaid so the file stays small —
 // works offline for text but math/diagrams need internet on first open.
 
-export function buildExportHtml(contentHtml: string, displayName: string): string {
+// Also strip escaped-dollar and unwrap math-in-code so downloads render properly.
+function preprocessMath(html: string): string {
+  if (!html) return html;
+  let out = html.replace(/\\\$/g, "$");
+  out = out.replace(/<pre\b[^>]*>\s*(\$\$[\s\S]+?\$\$)\s*<\/pre>/gi, '<p>$1</p>');
+  out = out.replace(/<code\b[^>]*>\s*(\$\$[\s\S]+?\$\$)\s*<\/code>/gi, '$1');
+  out = out.replace(/<code\b[^>]*>\s*(\$[^\s$][^$]{0,300}?\$)\s*<\/code>/g, '$1');
+  return out;
+}
+
+export function buildExportHtml(rawContentHtml: string, displayName: string): string {
+  const contentHtml = preprocessMath(rawContentHtml);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

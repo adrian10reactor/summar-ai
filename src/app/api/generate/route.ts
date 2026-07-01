@@ -19,8 +19,10 @@ type Mode = "quiz" | "study-guide" | "cheat-sheet" | "exam-prep" | "custom";
 const RICH_VISUALS = `
 RICH VISUALS — use whichever fits best. All render natively in the app:
 
-1) MATH — always typeset math with LaTeX inside \\$...\\$ (inline) or \\$\\$...\\$\\$ (display).
-   NEVER write formulas as plain text like "E = m*c^2" — always use \\$E = mc^2\\$ or \\$\\$E = mc^2\\$\\$.
+1) MATH — always typeset math with LaTeX inside $...$ (inline) or $$...$$ (display).
+   Write bare dollar delimiters — NOT escaped like \\$ or \\\\$. Just $x^2$ and $$\\int f(x)dx$$.
+   NEVER wrap math inside <pre>, <code>, or a code block — math delimiters go INLINE in normal prose, not inside code formatting.
+   NEVER write formulas as plain text like "E = m*c^2" — always use $E = mc^2$ or $$E = mc^2$$.
    Applies to ALL subjects: physics, chemistry, statistics, econ, linguistics IPA, music theory, whatever.
 
 2) STRUCTURED DIAGRAMS via Mermaid — wrap in <div class="mermaid">…</div>. Great for:
@@ -32,6 +34,11 @@ RICH VISUALS — use whichever fits best. All render natively in the app:
    - timelines / gantt (history, project plans)
    - mindmaps (concept maps)
    Example: <div class="mermaid">flowchart TD; A[Start] --> B{Decision}; B -->|yes| C; B -->|no| D</div>
+   Mermaid syntax MUST be strict and minimal or it will fail:
+   - Node labels: keep them SHORT and free of parentheses, quotes, math delimiters, angle brackets, or LaTeX. Rewrite "f(x_0)" as "f of x0" inside a label.
+   - Never nest $...$ math or HTML tags inside Mermaid labels.
+   - Prefer flowchart TD / LR with simple ASCII arrows (-->, ---, -.->).
+   - If a diagram concept is spatial/quantitative (physics, geometry, etc.), use SVG instead — Mermaid is for structured flow/state.
 
 3) FREEFORM SVG SKETCHES — inline <svg viewBox="0 0 W H" xmlns="http://www.w3.org/2000/svg">…</svg>.
    Use when a spatial diagram is called for and the numeric values from the problem matter:
