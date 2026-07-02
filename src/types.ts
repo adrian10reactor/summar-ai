@@ -73,6 +73,18 @@ export interface CustomSection {
   generatedAt?: number;
 }
 
+export interface Flashcard {
+  id: string;
+  front: string;
+  back: string;
+  createdAt: number;
+  interval: number;      // days until next review
+  easeFactor: number;    // SM-2 ease (starts at 2.5, clamps [1.3, 2.7])
+  dueAt: number;         // ms epoch; if <= now, the card is due
+  reviewCount: number;
+  lastReview?: number;
+}
+
 export interface SubjectContent {
   studyGuide?: { html: string; generatedAt: number };
   cheatSheet?: { html: string; generatedAt: number };
@@ -81,6 +93,7 @@ export interface SubjectContent {
   quizzes: SavedQuiz[];
   chats: ChatConversation[];
   customSections: CustomSection[];
+  flashcards?: Flashcard[];
   chatHistory?: ChatMessage[];
 }
 
@@ -93,4 +106,4 @@ export interface Subject {
   createdAt: number;
 }
 
-export type SubjectTab = "materials" | "study-guide" | "quiz" | "cheat-sheet" | "exam-prep" | "exam-solve" | "chat";
+export type SubjectTab = "materials" | "study-guide" | "quiz" | "cheat-sheet" | "exam-prep" | "exam-solve" | "flashcards" | "chat";

@@ -15,6 +15,7 @@ import { extractSubjectTopics } from "@/lib/render";
 const GEN_SECTIONS = [
   { key: "study-guide", label: "Study Guide", icon: "📖", desc: "Comprehensive notes organized by topic" },
   { key: "quiz", label: "Quiz", icon: "❓", desc: "Multiple-choice questions from materials" },
+  { key: "flashcards", label: "Flashcards", icon: "🃏", desc: "Auto-generated Anki-style cards with spaced repetition" },
   { key: "cheat-sheet", label: "Cheat Sheet", icon: "⚡", desc: "Compact reference with key facts & formulas" },
   { key: "exam-prep", label: "Exam Prep", icon: "🎓", desc: "Solved problems, likely questions, traps" },
   { key: "exam-solve", label: "Exam Solutions", icon: "✍️", desc: "Solve every problem in uploaded exams, step by step" },
@@ -53,7 +54,7 @@ export default function MaterialsTab({
   const inputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const [selected, setSelected] = useState<Set<string>>(new Set(["study-guide", "quiz", "cheat-sheet", "exam-prep"]));
+  const [selected, setSelected] = useState<Set<string>>(new Set(["study-guide", "quiz", "flashcards", "cheat-sheet", "exam-prep"]));
   const [customPrompt, setCustomPrompt] = useState("");
 
   const [editingCustomId, setEditingCustomId] = useState<string | null>(null);
@@ -211,6 +212,7 @@ export default function MaterialsTab({
     if (key === "cheat-sheet") return !!subject.content.cheatSheet;
     if (key === "exam-prep") return !!subject.content.examPrep;
     if (key === "exam-solve") return !!subject.content.examSolutions;
+    if (key === "flashcards") return (subject.content.flashcards || []).length > 0;
     return false;
   };
 

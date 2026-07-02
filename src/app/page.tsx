@@ -177,12 +177,23 @@ export default function Home() {
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {subjects.map((s) => (
+          {subjects.map((s) => {
+            const now = Date.now();
+            const dueCount = (s.content.flashcards || []).filter((c) => c.dueAt <= now).length;
+            return (
             <button
               key={s.id}
               onClick={() => setActive({ kind: "subject", id: s.id })}
-              className="group p-4 rounded-xl border border-zinc-800 hover:border-violet-500/40 text-left transition-all hover:bg-zinc-900/50"
+              className="group p-4 rounded-xl border border-zinc-800 hover:border-violet-500/40 text-left transition-all hover:bg-zinc-900/50 relative"
             >
+              {dueCount > 0 && (
+                <span
+                  className="absolute top-2 right-2 text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/40"
+                  title={`${dueCount} flashcard${dueCount !== 1 ? "s" : ""} due for review`}
+                >
+                  🃏 {dueCount}
+                </span>
+              )}
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
                 <span className="text-sm font-medium text-zinc-200 truncate">{s.name}</span>
@@ -201,9 +212,11 @@ export default function Home() {
                 {s.content.quizzes.length > 0 && <span>· {s.content.quizzes.length} quiz{s.content.quizzes.length !== 1 ? "zes" : ""}</span>}
                 {s.content.studyGuide && <span>· study guide</span>}
                 {s.content.cheatSheet && <span>· cheat sheet</span>}
+                {(s.content.flashcards || []).length > 0 && <span>· {(s.content.flashcards || []).length} cards</span>}
               </div>
             </button>
-          ))}
+            );
+          })}
         </div>
 
         {/* Cross-subject chats */}

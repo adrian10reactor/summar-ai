@@ -8,6 +8,7 @@ import QuizTab from "./tabs/QuizTab";
 import CheatSheetTab from "./tabs/CheatSheetTab";
 import ExamPrepTab from "./tabs/ExamPrepTab";
 import ExamSolutionsTab from "./tabs/ExamSolutionsTab";
+import FlashcardsTab from "./tabs/FlashcardsTab";
 import ChatTab from "./tabs/ChatTab";
 import CustomSectionTab from "./tabs/CustomSectionTab";
 import { ImageLookup } from "@/lib/render";
@@ -20,6 +21,7 @@ type TabKey = SubjectTab | { kind: "custom"; id: string };
 const SECTIONS: { key: SubjectTab; label: string; icon: string }[] = [
   { key: "materials", label: "Materials", icon: "📁" },
   { key: "study-guide", label: "Study Guide", icon: "📖" },
+  { key: "flashcards", label: "Flashcards", icon: "🃏" },
   { key: "quiz", label: "Quiz", icon: "❓" },
   { key: "cheat-sheet", label: "Cheat Sheet", icon: "⚡" },
   { key: "exam-prep", label: "Exam Prep", icon: "🎓" },
@@ -34,6 +36,7 @@ function sectionStatus(subject: Subject, key: SubjectTab): "empty" | "ready" {
   if (key === "cheat-sheet") return subject.content.cheatSheet ? "ready" : "empty";
   if (key === "exam-prep") return subject.content.examPrep ? "ready" : "empty";
   if (key === "exam-solve") return subject.content.examSolutions ? "ready" : "empty";
+  if (key === "flashcards") return (subject.content.flashcards || []).length > 0 ? "ready" : "empty";
   if (key === "chat") return subject.content.chats.length > 0 ? "ready" : "empty";
   return "empty";
 }
@@ -403,6 +406,17 @@ export default function SubjectView({
               onUpdated={onSubjectUpdated}
               imageLookup={imageLookup}
               onCrossRefClick={setCrossRef}
+            />
+          )}
+          {tab === "flashcards" && (
+            <FlashcardsTab
+              subject={subject}
+              getMaterials={getMaterialsForApi}
+              hasLoadedMaterials={hasLoadedMaterials}
+              hasMaterials={hasMaterials}
+              onCost={handleCostIncurred}
+              onUpdated={onSubjectUpdated}
+              imageLookup={imageLookup}
             />
           )}
           {tab === "chat" && (

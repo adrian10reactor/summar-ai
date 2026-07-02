@@ -1,4 +1,6 @@
-import { Quiz, SavedQuiz, Subject, Material, ChatMessage, ChatConversation, CustomSection, CrossSubjectChat } from "@/types";
+import { Quiz, SavedQuiz, Subject, Material, ChatMessage, ChatConversation, CustomSection, CrossSubjectChat, Flashcard } from "@/types";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const SUBJECTS_KEY = "summar-subjects";
 const CROSS_CHATS_KEY = "summar-cross-chats";
@@ -277,6 +279,116 @@ export function deleteCustomSection(subjectId: string, sectionId: string) {
   saveSubjects(all);
 }
 
+// Flashcards + spaced repetition (SM-2 variant)
+// -------------------------------------------------------------------------
+
+export function getFlashcards(subjectId: string): Flashcard[] {
+  const all = getSubjects();
+  const s = all.find((s) => s.id === subjectId);
+  return s?.content.flashcards || [];
+}
+
+export function addFlashcards(
+  subjectId: string,
+  cards: { front: string; back: string }[]
+): Flashcard[] {
+  const all = getSubjects();
+  const s = all.find((s) => s.id === subjectId);
+  if (!s) throw new Error("Subject not found");
+  if (!s.content.flashcards) s.content.flashcards = [];
+  const now = Date.now();
+  const created: Flashcard[] = cards.map((c) => ({
+    id: crypto.randomUUID(),
+    front: c.front,
+    back: c.back,
+    createdAt: now,
+    interval: 0,
+    easeFactor: 2.5,
+    dueAt: now,             // new cards are due immediately
+    reviewCount: 0,
+  }));
+  s.content.flashcards.push(...created);
+  saveSubjects(all);
+  return created;
+}
+
+export function deleteFlashcard(subjectId: string, cardId: string) {
+  const all = getSubjects();
+  const s = all.find((s) => s.id === subjectId);
+  if (!s || !s.content.flashcards) return;
+  s.content.flashcards = s.content.flashcards.filter((c) => c.id !== cardId);
+  saveSubjects(all);
+}
+
+export function updateFlashcard(
+  subjectId: string,
+  cardId: string,
+  patch: Partial<Pick<Flashcard, "front" | "back">>
+) {
+  const all = getSubjects();
+  const s = all.find((s) => s.id === subjectId);
+  const card = s?.content.flashcards?.find((c) => c.id === cardId);
+  if (card) {
+    Object.assign(card, patch);
+    saveSubjects(all);
+  }
+}
+
+// SM-2 rating: 0 = Again, 1 = Hard, 2 = Good, 3 = Easy
+export function reviewFlashcard(subjectId: string, cardId: string, rating: 0 | 1 | 2 | 3) {
+  const all = getSubjects();
+  const s = all.find((s) => s.id === subjectId);
+  const card = s?.content.flashcards?.find((c) => c.id === cardId);
+  if (!card) return;
+
+  const now = Date.now();
+  card.reviewCount += 1;
+  card.lastReview = now;
+
+  if (rating === 0) {
+    // Again — reset interval, drop ease.
+    card.interval = 0;
+    card.easeFactor = Math.max(1.3, card.easeFactor - 0.2);
+  } else {
+    if (card.interval === 0) {
+      card.interval = rating === 1 ? 1 : rating === 2 ? 2 : 4;
+    } else if (card.interval === 1) {
+      card.interval = rating === 1 ? 2 : rating === 2 ? 4 : 7;
+    } else {
+      const mult = rating === 1 ? 1.2 : rating === 2 ? card.easeFactor : card.easeFactor * 1.3;
+      card.interval = Math.round(card.interval * mult);
+    }
+    const delta = rating === 1 ? -0.15 : rating === 2 ? 0 : 0.10;
+    card.easeFactor = Math.max(1.3, Math.min(2.7, card.easeFactor + delta));
+  }
+
+  card.dueAt = now + Math.max(1, card.interval) * DAY_MS - (card.interval === 0 ? DAY_MS : 0);
+  // For a "0" Again result, set the card to be due in 10 minutes rather than
+  // instantly, so the user can churn through a review session without one
+  // troublesome card cycling infinitely.
+  if (rating === 0) card.dueAt = now + 10 * 60 * 1000;
+
+  saveSubjects(all);
+}
+
+export function getDueFlashcards(subjectId: string): Flashcard[] {
+  const cards = getFlashcards(subjectId);
+  const now = Date.now();
+  return cards.filter((c) => c.dueAt <= now);
+}
+
+export function getDueCountAcrossSubjects(): { subjectId: string; due: number }[] {
+  const all = getSubjects();
+  const now = Date.now();
+  return all
+    .map((s) => ({
+      subjectId: s.id,
+      due: (s.content.flashcards || []).filter((c) => c.dueAt <= now).length,
+    }))
+    .filter((x) => x.due > 0);
+}
+
+// -------------------------------------------------------------------------
 // Cross-subject chats (global, not scoped to any subject)
 
 export function getCrossChats(): CrossSubjectChat[] {

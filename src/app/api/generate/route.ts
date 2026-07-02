@@ -12,7 +12,7 @@ const MODELS = [
   "gemini-2.0-flash-lite-001",
 ];
 
-type Mode = "quiz" | "study-guide" | "cheat-sheet" | "exam-prep" | "custom" | "exam-solve";
+type Mode = "quiz" | "study-guide" | "cheat-sheet" | "exam-prep" | "custom" | "exam-solve" | "flashcards";
 
 const RICH_VISUALS = `
 RICH VISUALS — use whichever fits best. All render natively in the app:
@@ -144,6 +144,30 @@ Rules:
 ${RICH_VISUALS}
 
 Start directly with the HTML content.`;
+  }
+
+  if (mode === "flashcards") {
+    return `You are creating spaced-repetition flashcards from the provided document${plural}. Return between 25 and 60 cards covering the key testable facts.
+
+${multiNote}
+
+Card design rules — VERY important for good spaced-repetition practice:
+- Each card is ONE atomic fact. If a fact has 3 components, make 3 cards, not one card with 3 answers.
+- Front is a concise question OR a cloze prompt (e.g. "Definition of derivative" or "Newton's second law:").
+- Back is the answer, kept SHORT — usually one sentence, at most a formula and a one-line explanation.
+- Formulas MUST be typed with LaTeX between $ delimiters (inline) or $$ delimiters (block).
+- Do NOT nest a whole textbook page in one card. If your back is longer than ~200 characters, split it.
+- Do NOT re-ask the exact same question with different wording — vary the material.
+- Cover the full breadth of the document — don't cluster all cards on the first two pages.
+- Language: match the language of the source materials.
+
+Respond ONLY with valid JSON, no markdown, no code fences. Format:
+{
+  "cards": [
+    { "front": "...", "back": "..." },
+    { "front": "...", "back": "..." }
+  ]
+}`;
   }
 
   if (mode === "exam-solve") {
@@ -425,7 +449,7 @@ export async function POST(req: NextRequest) {
       result = { text: or.text, tokensIn: or.tokensIn, tokensOut: or.tokensOut };
     }
 
-    if (mode === "quiz") {
+    if (mode === "quiz" || mode === "flashcards") {
       const jsonStr = result.text
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")

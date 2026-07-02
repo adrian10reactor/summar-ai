@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Subject, Quiz, Question } from "@/types";
 import {
   saveStudyGuide, saveCheatSheet, saveExamPrep, saveExamSolutions,
-  saveQuizToSubject, saveCustomSectionHtml,
+  saveQuizToSubject, saveCustomSectionHtml, addFlashcards,
   getSubjects,
 } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
@@ -67,7 +67,7 @@ export function useGeneration(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await parseApiResponse<{ html: string; title?: string; questions?: Question[]; _usage?: { tokensIn: number; tokensOut: number } }>(res);
+      const data = await parseApiResponse<{ html: string; title?: string; questions?: Question[]; cards?: { front: string; back: string }[]; _usage?: { tokensIn: number; tokensOut: number } }>(res);
 
       const usage = data._usage || { tokensIn: 0, tokensOut: 0 };
       const apiCost = estimateApiCost(usage.tokensIn, usage.tokensOut);
@@ -83,6 +83,9 @@ export function useGeneration(
         saveQuizToSubject(subject.id, quiz, data.title || "Quiz");
       } else if (mode === "custom" && opts?.customSectionId) {
         saveCustomSectionHtml(subject.id, opts.customSectionId, data.html);
+      } else if (mode === "flashcards") {
+        const cards = data.cards || [];
+        if (cards.length > 0) addFlashcards(subject.id, cards);
       }
 
       setDone((p) => new Set(p).add(stateKey));
