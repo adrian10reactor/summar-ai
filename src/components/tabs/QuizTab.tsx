@@ -35,27 +35,32 @@ export default function QuizTab({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [durationMinutes, setDurationMinutes] = useState<number>(0); // 0 = no timer
 
-  const handleGenerate = async () => {
+  const runGenerate = async (opts: { customPrompt?: string; label?: string; durationMinutes?: number } = {}) => {
     const materials = getMaterials();
     if (materials.length === 0) return;
     setLoading(true);
     setError("");
 
     try {
+      const body: Record<string, unknown> = { mode: "quiz", materials };
+      if (opts.customPrompt) body.customPrompt = opts.customPrompt;
+
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "quiz", materials }),
+        body: JSON.stringify(body),
       });
       const data = await parseApiResponse<{ title?: string; questions: import("@/types").Question[]; _usage?: { tokensIn: number; tokensOut: number } }>(res);
 
       const usage = data._usage || { tokensIn: 0, tokensOut: 0 };
       const apiCost = estimateApiCost(usage.tokensIn, usage.tokensOut);
       const { charged } = deductCredits(apiCost, "quiz", subject.name, usage.tokensIn, usage.tokensOut);
-      onCost(charged, "Generated Quiz");
+      onCost(charged, opts.label || "Generated Quiz");
 
-      const quiz: Quiz = { title: data.title || "Quiz", questions: data.questions };
+      const finalDuration = opts.durationMinutes ?? (durationMinutes || undefined);
+      const quiz: Quiz = { title: data.title || "Quiz", questions: data.questions, durationMinutes: finalDuration };
       const saved = saveQuizToSubject(subject.id, quiz, data.title || "Quiz");
       setActiveQuiz(quiz);
       setActiveQuizId(saved.id);
@@ -67,6 +72,14 @@ export default function QuizTab({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGenerate = () => runGenerate();
+
+  const handleDrillWeakSpots = async (wrongQuestions: string[]) => {
+    if (wrongQuestions.length === 0) return;
+    const prompt = `Generate a new quiz that focuses SPECIFICALLY on the topics and concepts underlying these questions the student got wrong: \n\n${wrongQuestions.map((q, i) => `${i + 1}. ${q}`).join("\n")}\n\nCover the SAME topics/concepts but with fresh questions, not identical wording. Include easier warm-up questions on the concept AND slightly harder variants to build mastery.`;
+    await runGenerate({ customPrompt: prompt, label: "Drill: weak spots", durationMinutes: 0 });
   };
 
   const handlePlay = (quizId: string) => {
@@ -125,22 +138,53 @@ export default function QuizTab({
   if (view === "result" && activeQuiz) {
     return (
       <div className="animate-slide-up">
-        <ResultStep quiz={activeQuiz} answers={answers} score={score} onReset={handleBack} />
+        <ResultStep
+          quiz={activeQuiz}
+          answers={answers}
+          score={score}
+          onReset={handleBack}
+          onDrillWeakSpots={handleDrillWeakSpots}
+          drilling={loading}
+        />
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3 flex-wrap">
         <h3 className="text-sm font-semibold text-zinc-300">Quizzes</h3>
-        <button
-          onClick={handleGenerate}
-          disabled={loading || !hasLoadedMaterials}
-          className="text-xs px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40 transition-colors"
-        >
-          {loading ? "Generating..." : "Generate New Quiz"}
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <label className="text-[10px] text-zinc-500 uppercase tracking-wider">Timer</label>
+          <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-0.5">
+            {[
+              { v: 0, label: "Off" },
+              { v: 5, label: "5m" },
+              { v: 15, label: "15m" },
+              { v: 30, label: "30m" },
+              { v: 60, label: "60m" },
+            ].map((opt) => (
+              <button
+                key={opt.v}
+                onClick={() => setDurationMinutes(opt.v)}
+                className={`text-[11px] px-2 py-1 rounded-md transition-colors ${
+                  durationMinutes === opt.v
+                    ? "bg-violet-600/30 text-violet-200"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={handleGenerate}
+            disabled={loading || !hasLoadedMaterials}
+            className="text-xs px-3 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-500 disabled:opacity-40 transition-colors"
+          >
+            {loading ? "Generating..." : "Generate New Quiz"}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -171,6 +215,9 @@ export default function QuizTab({
           </div>
           <div className="flex items-center gap-3 text-xs text-zinc-500 mb-2">
             <span>{sq.quiz.questions.length} questions</span>
+            {sq.quiz.durationMinutes && sq.quiz.durationMinutes > 0 && (
+              <span className="text-amber-400 font-mono">⏱ {sq.quiz.durationMinutes}m</span>
+            )}
             <span>{new Date(sq.createdAt).toLocaleDateString()}</span>
             {sq.lastScore !== undefined && (
               <span className="text-violet-400">

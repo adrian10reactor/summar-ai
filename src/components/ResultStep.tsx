@@ -10,15 +10,22 @@ export default function ResultStep({
   answers,
   score,
   onReset,
+  onDrillWeakSpots,
+  drilling = false,
 }: {
   quiz: Quiz;
   answers: Record<number, number>;
   score: number;
   onReset: () => void;
+  onDrillWeakSpots?: (wrongQuestions: string[]) => void;
+  drilling?: boolean;
 }) {
   const total = quiz.questions.length;
   const pct = Math.round((score / total) * 100);
   const [copied, setCopied] = useState(false);
+  const wrongQuestions = quiz.questions
+    .filter((_, i) => answers[i] !== quiz.questions[i].correctIndex)
+    .map((q) => q.question);
 
   const handleShare = async () => {
     const ok = await copyShareLink(quiz);
@@ -96,12 +103,23 @@ export default function ResultStep({
         })}
       </div>
 
-      <button
-        onClick={onReset}
-        className="w-full py-3 rounded-xl font-semibold text-white bg-violet-600 hover:bg-violet-500 transition-colors"
-      >
-        Try Another PDF
-      </button>
+      <div className="space-y-2">
+        {onDrillWeakSpots && wrongQuestions.length > 0 && (
+          <button
+            onClick={() => onDrillWeakSpots(wrongQuestions)}
+            disabled={drilling}
+            className="w-full py-3 rounded-xl font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 transition-all"
+          >
+            {drilling ? "Generating targeted drill..." : `🎯 Drill weak spots (${wrongQuestions.length} to practice)`}
+          </button>
+        )}
+        <button
+          onClick={onReset}
+          className="w-full py-3 rounded-xl font-semibold text-zinc-300 border border-zinc-700 hover:text-white hover:border-zinc-500 transition-colors"
+        >
+          Back to quizzes
+        </button>
+      </div>
     </div>
   );
 }

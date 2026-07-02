@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Quiz } from "@/types";
 
 export default function QuizStep({
@@ -16,6 +16,35 @@ export default function QuizStep({
   const [animKey, setAnimKey] = useState(0);
   const total = quiz.questions.length;
   const q = quiz.questions[current];
+
+  // Countdown timer (only if the quiz has a duration set).
+  const [remaining, setRemaining] = useState<number | null>(
+    quiz.durationMinutes ? quiz.durationMinutes * 60 : null
+  );
+  const submittedRef = useRef(false);
+  const submitNow = (a: Record<number, number>) => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    onSubmit(a);
+  };
+
+  useEffect(() => {
+    if (remaining === null) return;
+    if (remaining <= 0) {
+      submitNow(answers);
+      return;
+    }
+    const id = setInterval(() => setRemaining((r) => (r === null ? null : r - 1)), 1000);
+    return () => clearInterval(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining]);
+
+  const formatTime = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+  const timeLow = remaining !== null && remaining <= 60;
 
   const select = (optIndex: number) => {
     setAnswers((prev) => ({ ...prev, [current]: optIndex }));
@@ -33,9 +62,16 @@ export default function QuizStep({
     <div className="space-y-6">
       <div className="flex items-center justify-between text-sm text-zinc-500">
         <span>{quiz.title}</span>
-        <span>
-          {answered}/{total} answered
-        </span>
+        <div className="flex items-center gap-3">
+          {remaining !== null && (
+            <span className={`font-mono px-2 py-0.5 rounded-md border ${
+              timeLow ? "border-red-500/60 text-red-300 bg-red-500/10 animate-pulse" : "border-zinc-700 text-zinc-300 bg-zinc-900"
+            }`}>
+              ⏱ {formatTime(remaining)}
+            </span>
+          )}
+          <span>{answered}/{total} answered</span>
+        </div>
       </div>
 
       <div className="w-full bg-zinc-800 rounded-full h-1.5">
@@ -95,7 +131,7 @@ export default function QuizStep({
           </button>
         ) : (
           <button
-            onClick={() => onSubmit(answers)}
+            onClick={() => submitNow(answers)}
             disabled={answered < total}
             className="px-6 py-2 text-sm rounded-lg bg-violet-600 text-white font-semibold hover:bg-violet-500 disabled:opacity-40 transition-all duration-200 hover:scale-105"
           >
