@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI, Part, Content } from "@google/generative-ai";
 import { callOpenRouter, isOpenRouterConfigured, OpenRouterMessage } from "@/lib/openrouter";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const MODELS = [
   "gemini-2.5-flash",
   "gemini-2.0-flash",

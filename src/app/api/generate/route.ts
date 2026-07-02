@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenerativeAI, Part } from "@google/generative-ai";
 import { callOpenRouter, isOpenRouterConfigured, OpenRouterMessage } from "@/lib/openrouter";
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 const MODELS = [
   "gemini-2.5-flash",
   "gemini-2.0-flash",
@@ -454,7 +457,17 @@ export async function POST(req: NextRequest) {
         .replace(/```json\n?/g, "")
         .replace(/```\n?/g, "")
         .trim();
-      const data = JSON.parse(jsonStr);
+      let data;
+      try {
+        data = JSON.parse(jsonStr);
+      } catch {
+        // Model likely put LaTeX like $\sqrt{2}$ inside a JSON string. Backslashes
+        // that aren't valid JSON escapes ("bfnrtu\/) get doubled so JSON.parse
+        // can round-trip them back to their literal form. Retry once with the
+        // sanitized payload before giving up.
+        const sanitized = jsonStr.replace(/\\(?!["\\/bfnrtu])/g, "\\\\");
+        data = JSON.parse(sanitized);
+      }
       return NextResponse.json({
         ...data,
         _usage: { tokensIn: result.tokensIn, tokensOut: result.tokensOut },
