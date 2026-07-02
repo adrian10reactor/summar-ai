@@ -12,7 +12,7 @@ const MODELS = [
   "gemini-2.0-flash-lite-001",
 ];
 
-type Mode = "quiz" | "study-guide" | "cheat-sheet" | "exam-prep" | "custom";
+type Mode = "quiz" | "study-guide" | "cheat-sheet" | "exam-prep" | "custom" | "exam-solve";
 
 const RICH_VISUALS = `
 RICH VISUALS — use whichever fits best. All render natively in the app:
@@ -134,6 +134,33 @@ Rules:
 ${RICH_VISUALS}
 
 Start directly with the HTML content.`;
+  }
+
+  if (mode === "exam-solve") {
+    return `You are a master tutor. The provided document${plural} contain one or more exam papers, problem sheets, or task collections. Your job: SOLVE every problem in them, one by one, with full explanations a student can learn from.
+
+${multiNote}
+
+For EACH problem:
+1. Restate the problem clearly (paraphrased in your own words is fine, but include the given numbers verbatim).
+2. Show the setup — list the givens and what's being asked, define notation.
+3. Draw a sketch when the problem is spatial / quantitative (physics free body, projectile, geometry, circuit, ray optics, chemistry structure, etc.) — inline <svg> with the actual numbers from the problem baked into <text> labels.
+4. Solve step by step. Every non-trivial step gets a one-line justification ("apply Newton's second law", "differentiate both sides w.r.t. t", etc.).
+5. Box the final answer clearly (bold + a boxed div or clear delimiter).
+6. Explain the conceptual takeaway in one or two sentences — what did this problem teach?
+7. If the problem statement comes from a specific page of a specific uploaded PDF, cite it: "(from Exam_2023.pdf, p. 3)".
+
+Structural rules:
+- Use <h2> per exam / problem set, <h3> per individual problem ("Problem 1", "Zadatak 2", whatever the source uses).
+- Include ALL problems — don't skip any, even easy ones. Students often want the easy ones worked too so they can check technique.
+- If a problem is ambiguous or has multiple interpretations, briefly note that at the top and solve the most likely one.
+- Output ONLY valid HTML (no markdown, no code fences, no wrapping).
+- Use these HTML elements: <h2>, <h3>, <h4>, <p>, <ul>, <ol>, <li>, <strong>, <em>, <code>, <pre>, <blockquote>, <table>, <tr>, <th>, <td>, <hr>, <div>, <svg>, <details>, <summary>
+- Do NOT include <html>, <head>, <body>, <style> tags
+
+${RICH_VISUALS}
+
+Start directly with the first <h2>.`;
   }
 
   if (mode === "custom") {

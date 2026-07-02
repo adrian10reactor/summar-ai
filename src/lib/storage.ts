@@ -130,6 +130,15 @@ export function saveExamPrep(subjectId: string, html: string) {
   }
 }
 
+export function saveExamSolutions(subjectId: string, html: string) {
+  const all = getSubjects();
+  const s = all.find((s) => s.id === subjectId);
+  if (s) {
+    s.content.examSolutions = { html, generatedAt: Date.now() };
+    saveSubjects(all);
+  }
+}
+
 export function saveQuizToSubject(subjectId: string, quiz: Quiz, name: string): SavedQuiz {
   const all = getSubjects();
   const s = all.find((s) => s.id === subjectId);
@@ -176,7 +185,7 @@ export function saveChatHistory(subjectId: string, messages: ChatMessage[]) {
   }
 }
 
-export function createChat(subjectId: string, name: string): ChatConversation {
+export function createChat(subjectId: string, name: string, mode: "regular" | "feynman" | "blurting" = "regular"): ChatConversation {
   const all = getSubjects();
   const s = all.find((s) => s.id === subjectId);
   if (!s) throw new Error("Subject not found");
@@ -185,6 +194,7 @@ export function createChat(subjectId: string, name: string): ChatConversation {
     name,
     messages: [],
     createdAt: Date.now(),
+    mode,
   };
   s.content.chats.unshift(chat);
   saveSubjects(all);

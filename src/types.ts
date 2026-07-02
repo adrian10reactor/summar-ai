@@ -46,11 +46,14 @@ export interface ChatMessage {
   attachments?: ChatAttachment[];
 }
 
+export type ChatMode = "regular" | "feynman" | "blurting";
+
 export interface ChatConversation {
   id: string;
   name: string;
   messages: ChatMessage[];
   createdAt: number;
+  mode?: ChatMode;
 }
 
 export interface CrossSubjectChat {
@@ -73,6 +76,7 @@ export interface SubjectContent {
   studyGuide?: { html: string; generatedAt: number };
   cheatSheet?: { html: string; generatedAt: number };
   examPrep?: { html: string; generatedAt: number };
+  examSolutions?: { html: string; generatedAt: number };
   quizzes: SavedQuiz[];
   chats: ChatConversation[];
   customSections: CustomSection[];
@@ -88,4 +92,4 @@ export interface Subject {
   createdAt: number;
 }
 
-export type SubjectTab = "materials" | "study-guide" | "quiz" | "cheat-sheet" | "exam-prep" | "chat";
+export type SubjectTab = "materials" | "study-guide" | "quiz" | "cheat-sheet" | "exam-prep" | "exam-solve" | "chat";

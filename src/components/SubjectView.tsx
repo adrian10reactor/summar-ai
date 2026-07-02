@@ -7,6 +7,7 @@ import StudyGuideTab from "./tabs/StudyGuideTab";
 import QuizTab from "./tabs/QuizTab";
 import CheatSheetTab from "./tabs/CheatSheetTab";
 import ExamPrepTab from "./tabs/ExamPrepTab";
+import ExamSolutionsTab from "./tabs/ExamSolutionsTab";
 import ChatTab from "./tabs/ChatTab";
 import CustomSectionTab from "./tabs/CustomSectionTab";
 import { ImageLookup } from "@/lib/render";
@@ -22,6 +23,7 @@ const SECTIONS: { key: SubjectTab; label: string; icon: string }[] = [
   { key: "quiz", label: "Quiz", icon: "❓" },
   { key: "cheat-sheet", label: "Cheat Sheet", icon: "⚡" },
   { key: "exam-prep", label: "Exam Prep", icon: "🎓" },
+  { key: "exam-solve", label: "Exam Solutions", icon: "✍️" },
   { key: "chat", label: "Chat", icon: "💬" },
 ];
 
@@ -31,6 +33,7 @@ function sectionStatus(subject: Subject, key: SubjectTab): "empty" | "ready" {
   if (key === "quiz") return subject.content.quizzes.length > 0 ? "ready" : "empty";
   if (key === "cheat-sheet") return subject.content.cheatSheet ? "ready" : "empty";
   if (key === "exam-prep") return subject.content.examPrep ? "ready" : "empty";
+  if (key === "exam-solve") return subject.content.examSolutions ? "ready" : "empty";
   if (key === "chat") return subject.content.chats.length > 0 ? "ready" : "empty";
   return "empty";
 }
@@ -380,6 +383,18 @@ export default function SubjectView({
           )}
           {tab === "exam-prep" && (
             <ExamPrepTab
+              subject={subject}
+              getMaterials={getMaterialsForApi}
+              hasLoadedMaterials={hasLoadedMaterials}
+              hasMaterials={hasMaterials}
+              onCost={handleCostIncurred}
+              onUpdated={onSubjectUpdated}
+              imageLookup={imageLookup}
+              onCrossRefClick={setCrossRef}
+            />
+          )}
+          {tab === "exam-solve" && (
+            <ExamSolutionsTab
               subject={subject}
               getMaterials={getMaterialsForApi}
               hasLoadedMaterials={hasLoadedMaterials}

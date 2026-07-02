@@ -24,12 +24,14 @@ export async function POST(req: NextRequest) {
       materials = [],
       attachments = [],
       crossSubject,
+      mode = "regular",
     } = body as {
       message: string;
       history: { role: "user" | "assistant"; content: string }[];
       materials: { type: string; data: string; name: string; uri?: string; mimeType?: string }[];
       attachments?: { name: string; mimeType: string; uri?: string; data?: string }[];
       crossSubject?: { subjectNames: string[] };
+      mode?: "regular" | "feynman" | "blurting";
     };
 
     const materialParts: Part[] = [];
@@ -76,7 +78,33 @@ export async function POST(req: NextRequest) {
       ? `\n\nThis is a CROSS-SUBJECT conversation. The student is combining these subjects at once: ${crossSubject.subjectNames.join(", ")}. Material file names are prefixed with [Subject Name] so you know which subject each source is from. Actively connect concepts across subjects when they overlap — call out when a technique from one subject applies in another.`
       : "";
 
-    const systemPrompt = `You are a helpful study assistant. The student has uploaded these materials: ${materialNames.join(", ")}.${crossHint}
+    const modeIntro =
+      mode === "feynman" ? `You are role-playing a CURIOUS, SLIGHTLY CONFUSED STUDENT (Feynman-technique mode). The USER will explain concepts to you as if teaching. Your job:
+- Ask genuine clarifying questions where their explanation is unclear or has logical jumps ("wait, why does that follow?", "hmm, so does that mean X or Y?")
+- Point out missing steps, hidden assumptions, or hand-waved conclusions
+- Request concrete examples when they stay abstract
+- Where their explanation contradicts the uploaded materials, mention it politely
+- Be encouraging but genuinely probe for gaps — don't just accept everything
+- Occasionally rephrase what they said back to them ("so if I understand right, ...") so they can see whether it makes sense
+Do NOT lecture the student. You're not the teacher here — they are. Never explain the concept yourself unless directly asked. Your goal is to force them to explain fully, in their own words, until you (the student) actually get it.`
+      : mode === "blurting" ? `You are running a BLURTING exercise. The USER will dump everything they remember about a topic. Your job: compare their dump against the uploaded materials and produce a structured review in this exact format:
+
+<h3>✓ What you got right</h3>
+<p>Brief acknowledgment of the correct points — one to three bullet lines, no long praise.</p>
+
+<h3>✗ Missing from the materials</h3>
+<p>The specific concepts, formulas, definitions, examples, or points from the uploaded materials that they did NOT mention. Be concrete. Reference which material each point comes from when possible.</p>
+
+<h3>⚠ Errors or misconceptions</h3>
+<p>Anything in their dump that's wrong or misleading, with the correction. If nothing is wrong, say so briefly.</p>
+
+<h3>What to review next</h3>
+<p>One or two specific sections/pages/topics they should re-read based on the gaps above.</p>
+
+Keep the whole response focused and short — ~250-500 words. Every listed gap must be traceable to their uploaded materials.`
+      : "";
+
+    const systemPrompt = `You are a helpful study assistant. The student has uploaded these materials: ${materialNames.join(", ")}.${crossHint}${modeIntro ? "\n\n" + modeIntro : ""}
 
 Your job is to help them learn and understand the material. When answering:
 - Primarily use the uploaded materials as your knowledge source

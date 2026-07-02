@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { Subject, Quiz, Question } from "@/types";
 import {
-  saveStudyGuide, saveCheatSheet, saveExamPrep, saveQuizToSubject, saveCustomSectionHtml,
+  saveStudyGuide, saveCheatSheet, saveExamPrep, saveExamSolutions,
+  saveQuizToSubject, saveCustomSectionHtml,
   getSubjects,
 } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
@@ -76,6 +77,7 @@ export function useGeneration(
       if (mode === "study-guide") saveStudyGuide(subject.id, data.html);
       else if (mode === "cheat-sheet") saveCheatSheet(subject.id, data.html);
       else if (mode === "exam-prep") saveExamPrep(subject.id, data.html);
+      else if (mode === "exam-solve") saveExamSolutions(subject.id, data.html);
       else if (mode === "quiz") {
         const quiz: Quiz = { title: data.title || "Quiz", questions: data.questions || [] };
         saveQuizToSubject(subject.id, quiz, data.title || "Quiz");

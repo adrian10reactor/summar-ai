@@ -25,7 +25,7 @@ export default function HtmlContentTab({
   onCrossRefClick,
 }: {
   subject: Subject;
-  contentKey: "studyGuide" | "cheatSheet" | "examPrep";
+  contentKey: "studyGuide" | "cheatSheet" | "examPrep" | "examSolutions";
   title: string;
   emptyIcon: string;
   emptyText: string;

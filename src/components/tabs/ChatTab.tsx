@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, MutableRefObject } from "react";
-import { Subject, ChatMessage, ChatAttachment } from "@/types";
+import { Subject, ChatMessage, ChatAttachment, ChatMode } from "@/types";
 import { createChat, deleteChat, saveChatMessages, renameChat } from "@/lib/storage";
 import { deductCredits, estimateApiCost } from "@/lib/credits";
 import { parseApiResponse } from "@/lib/api";
@@ -100,8 +100,9 @@ export default function ChatTab({
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  const handleNewChat = () => {
-    const chat = createChat(subject.id, `Chat ${chats.length + 1}`);
+  const handleNewChat = (mode: ChatMode = "regular") => {
+    const label = mode === "feynman" ? "Feynman" : mode === "blurting" ? "Blurting" : "Chat";
+    const chat = createChat(subject.id, `${label} ${chats.length + 1}`, mode);
     onUpdated();
     setActiveChatId(chat.id);
     setMessages([]);
@@ -147,6 +148,7 @@ export default function ChatTab({
           history: updated.slice(-20).map((m) => ({ role: m.role, content: m.content })),
           materials,
           attachments: attachmentsReady.map((a) => ({ name: a.name, mimeType: a.mimeType, uri: a.uri })),
+          mode: activeChat?.mode || "regular",
         }),
       });
       const data = await parseApiResponse<{ reply: string; _usage?: { tokensIn: number; tokensOut: number } }>(res);
@@ -222,6 +224,12 @@ export default function ChatTab({
                 className="flex items-center gap-1.5 text-sm font-medium text-zinc-300 hover:text-zinc-100 transition-colors px-2 py-1 rounded-lg hover:bg-zinc-800"
               >
                 <span className="truncate max-w-[200px]">{activeChat?.name || "No chat"}</span>
+                {activeChat?.mode === "feynman" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">🧑‍🎓 Feynman</span>
+                )}
+                {activeChat?.mode === "blurting" && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300">🧠 Blurting</span>
+                )}
                 <span className="text-[10px] text-zinc-600">&#x25BC;</span>
               </button>
               {activeChat && (
@@ -238,11 +246,27 @@ export default function ChatTab({
 
           {showChatList && !renamingActiveTitle && (
             <div className="absolute top-full left-0 mt-1 w-72 bg-zinc-900 border border-zinc-700 rounded-xl shadow-xl z-50 py-1 animate-fade-in">
+              <div className="px-3 py-1.5 text-[10px] text-zinc-600 uppercase tracking-wider">New chat</div>
               <button
-                onClick={handleNewChat}
-                className="w-full text-left px-3 py-2 text-xs text-violet-400 hover:bg-zinc-800 transition-colors"
+                onClick={() => handleNewChat("regular")}
+                className="w-full text-left px-3 py-1.5 text-xs text-violet-400 hover:bg-zinc-800 transition-colors flex items-center gap-2"
               >
-                + New Chat
+                💬 <span>Regular</span>
+                <span className="text-[10px] text-zinc-600 ml-auto">Q&A with materials</span>
+              </button>
+              <button
+                onClick={() => handleNewChat("feynman")}
+                className="w-full text-left px-3 py-1.5 text-xs text-violet-400 hover:bg-zinc-800 transition-colors flex items-center gap-2"
+              >
+                🧑‍🎓 <span>Feynman</span>
+                <span className="text-[10px] text-zinc-600 ml-auto">You teach, AI probes</span>
+              </button>
+              <button
+                onClick={() => handleNewChat("blurting")}
+                className="w-full text-left px-3 py-1.5 text-xs text-violet-400 hover:bg-zinc-800 transition-colors flex items-center gap-2"
+              >
+                🧠 <span>Blurting</span>
+                <span className="text-[10px] text-zinc-600 ml-auto">Dump &amp; get graded</span>
               </button>
               <div className="border-t border-zinc-800 my-1" />
               {chats.map((c) => (
@@ -323,7 +347,7 @@ export default function ChatTab({
         )}
 
         <button
-          onClick={handleNewChat}
+          onClick={() => handleNewChat()}
           className="text-xs px-2.5 py-1 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors"
         >
           + New
@@ -336,7 +360,7 @@ export default function ChatTab({
           <div className="py-8 space-y-3">
             <p className="text-zinc-500 text-sm">Create a new chat to get started.</p>
             <button
-              onClick={handleNewChat}
+              onClick={() => handleNewChat()}
               className="text-xs px-4 py-2 rounded-lg bg-violet-600 text-white hover:bg-violet-500 transition-colors"
             >
               + New Chat
@@ -344,27 +368,43 @@ export default function ChatTab({
           </div>
         )}
 
-        {activeChatId && messages.length === 0 && (
-          <div className="py-8 space-y-3">
-            <p className="text-zinc-500 text-sm">Ask anything about your materials.</p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                "Explain the key concepts",
-                "What are the main topics covered?",
-                "Give me practice problems",
-                "What's most likely on the exam?",
-              ].map((q) => (
-                <button
-                  key={q}
-                  onClick={() => setInput(q)}
-                  className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
-                >
-                  {q}
-                </button>
-              ))}
+        {activeChatId && messages.length === 0 && (() => {
+          const modeText =
+            activeChat?.mode === "feynman"
+              ? { headline: "Teach the AI. It'll play a confused student and probe your explanation until you fill every gap.", starters: [
+                  "Let me explain <topic>...",
+                  "I'll teach you about <topic>",
+                  "So, <topic> works like this:",
+                ]}
+              : activeChat?.mode === "blurting"
+              ? { headline: "Dump everything you remember about a topic. The AI checks it against your materials and shows what's missing or wrong.", starters: [
+                  "Here's what I remember about <topic>:",
+                  "Everything I know about <topic>:",
+                  "Blurting <topic>:",
+                ]}
+              : { headline: "Ask anything about your materials.", starters: [
+                  "Explain the key concepts",
+                  "What are the main topics covered?",
+                  "Give me practice problems",
+                  "What's most likely on the exam?",
+                ]};
+          return (
+            <div className="py-8 space-y-3">
+              <p className="text-zinc-500 text-sm">{modeText.headline}</p>
+              <div className="flex flex-wrap gap-2">
+                {modeText.starters.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => setInput(q)}
+                    className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-500 transition-colors"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-fade-in`}>

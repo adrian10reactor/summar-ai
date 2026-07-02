@@ -17,6 +17,7 @@ const GEN_SECTIONS = [
   { key: "quiz", label: "Quiz", icon: "❓", desc: "Multiple-choice questions from materials" },
   { key: "cheat-sheet", label: "Cheat Sheet", icon: "⚡", desc: "Compact reference with key facts & formulas" },
   { key: "exam-prep", label: "Exam Prep", icon: "🎓", desc: "Solved problems, likely questions, traps" },
+  { key: "exam-solve", label: "Exam Solutions", icon: "✍️", desc: "Solve every problem in uploaded exams, step by step" },
 ] as const;
 
 type NavTarget = SubjectTab | { kind: "custom"; id: string };
@@ -209,6 +210,7 @@ export default function MaterialsTab({
     if (key === "quiz") return subject.content.quizzes.length > 0;
     if (key === "cheat-sheet") return !!subject.content.cheatSheet;
     if (key === "exam-prep") return !!subject.content.examPrep;
+    if (key === "exam-solve") return !!subject.content.examSolutions;
     return false;
   };
 
