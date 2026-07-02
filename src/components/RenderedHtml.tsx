@@ -71,6 +71,38 @@ async function renderMath(root: HTMLElement) {
   }
 }
 
+// Mount React artifact components into any `<div class="artifact" data-type=...
+// data-params=...>` placeholders the model emitted. Each mount is memoized on
+// the DOM node itself so re-renders of the parent don't re-mount and flicker.
+const artifactRoots = new WeakMap<HTMLElement, { destroy: () => void }>();
+async function renderArtifacts(root: HTMLElement) {
+  const nodes = root.querySelectorAll<HTMLElement>(".artifact[data-type]:not([data-artifact-mounted='true'])");
+  if (nodes.length === 0) return;
+  try {
+    const [{ createRoot }, { default: ArtifactRegistry }] = await Promise.all([
+      import("react-dom/client"),
+      import("./artifacts/ArtifactRegistry"),
+    ]);
+    const React = await import("react");
+    for (const node of Array.from(nodes)) {
+      if (node.dataset.artifactMounted === "true") continue;
+      const type = node.dataset.type || "";
+      let params: Record<string, unknown> = {};
+      const raw = node.dataset.params;
+      if (raw) {
+        try { params = JSON.parse(raw); } catch { /* keep {} */ }
+      }
+      node.dataset.artifactMounted = "true";
+      node.innerHTML = "";
+      const r = createRoot(node);
+      r.render(React.createElement(ArtifactRegistry, { type, params }));
+      artifactRoots.set(node, { destroy: () => r.unmount() });
+    }
+  } catch (e) {
+    console.warn("Artifact render failed", e);
+  }
+}
+
 async function renderMermaid(root: HTMLElement) {
   const nodes = root.querySelectorAll<HTMLElement>(".mermaid:not([data-processed='true']):not([data-mermaid-rendered='true'])");
   if (nodes.length === 0) return;
@@ -161,6 +193,7 @@ export default function RenderedHtml({
     if (!ref.current) return;
     renderMath(ref.current);
     renderMermaid(ref.current);
+    renderArtifacts(ref.current);
   }, [processed]);
 
   const handleClick: React.MouseEventHandler<HTMLDivElement> = (e) => {

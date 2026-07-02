@@ -39,7 +39,17 @@ RICH VISUALS — use whichever fits best. All render natively in the app:
    - Prefer flowchart TD / LR with simple ASCII arrows (-->, ---, -.->).
    - If a diagram concept is spatial/quantitative (physics, geometry, etc.), use SVG instead — Mermaid is for structured flow/state.
 
-3) FREEFORM SVG SKETCHES — inline <svg viewBox="0 0 W H" xmlns="http://www.w3.org/2000/svg">…</svg>.
+3) INTERACTIVE FUNCTION PLOTS via ARTIFACT — for anything that would benefit from a proper hover-scrubbable graph rather than a static SVG. Wrap in a self-closing div with a JSON payload:
+   <div class="artifact" data-type="function-plot" data-params='{"fn":"x^2","xRange":[-5,5]}'></div>
+   Params:
+     - "fn": one expression string (e.g. "x^2", "sin(x)", "exp(-x^2/2)")  OR  "fns": array of expressions to overlay
+     - "xRange": [xMin, xMax]  (required)
+     - "yRange": [yMin, yMax]  (optional — auto-fit if omitted)
+     - "title" / "xLabel" / "yLabel" (optional)
+   Allowed expression syntax: +, -, *, /, ^ (power), parentheses, and functions sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, sqrt, abs, exp, ln, log (=log10), floor, ceil, round, sign; constants pi, e.
+   Use plots for: functions and their derivatives, comparing scenarios (e.g. y=x^2 vs y=x^3), showing where a function has zeros/extrema, exponential growth/decay, trig curves. Do NOT use plots for spatial/geometric sketches — SVG is better for those.
+
+4) FREEFORM SVG SKETCHES — inline <svg viewBox="0 0 W H" xmlns="http://www.w3.org/2000/svg">…</svg>.
    Use when a spatial diagram is called for and the numeric values from the problem matter:
    - physics: free-body force diagrams (arrows for gravity, normal force, tension, friction), projectile motion with initial velocity vector and trajectory, ray optics with mirrors/lenses/rays, circuits, wave diagrams
    - math: geometry constructions with labeled sides/angles, coordinate systems with plotted points/functions, vector operations, number lines
@@ -49,7 +59,7 @@ RICH VISUALS — use whichever fits best. All render natively in the app:
    Use stroke="#a78bfa" for main lines, stroke="#e4e4e7" for axes/reference, fill="#e4e4e7" for text, define arrowhead <marker> once and reuse.
    Give the SVG a viewBox that fits the drawing so it scales. Keep it clean, not photorealistic.
 
-Pick the right tool: use Mermaid for structured/logical graphs, SVG for spatial/quantitative sketches, math delimiters for any equation.
+Pick the right tool: use function-plot for real graphs of expressions in x, Mermaid for structured/logical graphs, SVG for spatial/quantitative sketches, math delimiters for any equation.
 `;
 
 function buildPrompt(mode: Mode, fileCount: number, customSectionPrompt?: string): string {
